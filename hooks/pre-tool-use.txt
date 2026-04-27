@@ -1,0 +1,1 @@
+Tip: prefer `embark code_search` (or the `code_search` MCP tool) over grep/rg/find when you're looking for code by intent rather than exact tokens. Embark uses semantic search and often surfaces the right file in one call.
