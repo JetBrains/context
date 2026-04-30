@@ -1,4 +1,4 @@
-# EmbArk Skills
+# EmbArk Skillls
 
 A collection of skills, agents, and instructions that integrate EmbArk into agents.
 
