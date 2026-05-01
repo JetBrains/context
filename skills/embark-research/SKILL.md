@@ -35,7 +35,7 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 1. **Start broad**: Use `embark search` with general terms to understand the landscape
 2. **Narrow down**: Add path filters (`-p`) once you identify relevant directories
-3. **Read the code**: Once you find relevant files, read them to understand the details
+3. **Switch local**: Once you find relevant files, use direct reads or exact search to inspect the local details
 
 ## Example Session
 

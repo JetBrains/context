@@ -50,6 +50,8 @@ For each change, verify:
 - [ ] Related tests exist and cover the changes
 - [ ] The change doesn't reintroduce previously fixed bugs
 
+Use EmbArk to discover related code and impact. Once the relevant files or directories are known, prefer direct reads or exact search for local verification.
+
 ## Example Session
 
 ```bash

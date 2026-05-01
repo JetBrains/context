@@ -1,1 +1,1 @@
-Tip: when you need to locate code in this repo, try `embark code_search` (or the `code_search` MCP tool) before grep/rg/find. Semantic search tends to surface the right files in fewer turns.
+Tip: if you do not yet know the right file, subsystem, or related test, start with EmbArk before grep/rg/find. After that, switch to exact/local inspection once the target area is known.
