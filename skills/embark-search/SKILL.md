@@ -9,6 +9,21 @@ argument-hint: query
 
 Use `embark search` to find code snippets by meaning, not just keywords. If it's not installed use embark-install skill.
 
+## Tool Routing
+
+Wrong:
+- Using grep first to understand unfamiliar code
+- Using text search first to find related implementations by behavior
+
+Correct:
+- Use `embark search "<descriptive query>"` for semantic code discovery
+
+Invoke this skill immediately when:
+- You need to understand unfamiliar code, features, or subsystems
+- You need implementations, patterns, or usage examples
+- You need caller, dependency, or impact analysis
+- You need related tests described by behavior rather than exact filename
+
 ## Usage
 
 ```bash
@@ -19,9 +34,9 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 ## Query Tips
 
-- Be descriptive: "function that validates user email addresses" > "email"
-- Include context: "error handling middleware for HTTP requests with logging"
-- Specify what you're looking for: "React component that renders a modal dialog"
+- Use one focused natural-language intent per search
+- Good: `embark search "function that validates user email addresses"`
+- Bad: `embark search "email validate user auth form regex"`
 
 ## Examples
 

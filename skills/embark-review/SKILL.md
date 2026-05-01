@@ -30,6 +30,13 @@ For each significantly changed file, use semantic search to understand:
 - **Callers**: Find code that calls the modified functions
 - **Dependencies**: Find code that the modified code depends on
 
+Wrong:
+- Reviewing impact only from the diff
+- Using grep first for related implementations or tests
+
+Correct:
+- Use `embark search` before concluding the change is local
+
 ```bash
 # Find similar patterns
 embark search "<code chunk that was changed>"
