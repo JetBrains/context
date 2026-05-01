@@ -24,8 +24,10 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 - Use one focused natural-language query per search.
 - Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.
+- Inspect the first relevant file or directory before issuing another broad semantic search.
+- Use another broad `embark search` only if the local path stops being productive.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
-- If you search again after finding a relevant area, narrow with `-p <path>` when possible.
+- If you search again after finding a relevant area, narrow with `-p <path>`.
 
 ### Examples
 
@@ -43,4 +45,4 @@ embark search "calls to handleRequest to understand impact"
 embark search -p test "tests for authentication middleware"
 ```
 
-Use `embark search` first for discovery, then move to exact/local inspection once the target area is known.
+Use `embark search` first for discovery, inspect the first good hit, then move to exact/local inspection once the target area is known.

@@ -34,8 +34,9 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 ## Research Workflow
 
 1. **Start broad**: Use `embark search` with general terms to understand the landscape
-2. **Narrow down**: Add path filters (`-p`) once you identify relevant directories
-3. **Switch local**: Once you find relevant files, use direct reads or exact search to inspect the local details
+2. **Inspect the first hit**: Read the first relevant file or directory before issuing another broad search
+3. **Narrow down**: Add path filters (`-p`) once you identify relevant directories
+4. **Switch local**: Once you find relevant files, use direct reads or exact search to inspect the local details
 
 ## Example Session
 

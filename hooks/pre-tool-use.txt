@@ -1,1 +1,1 @@
-Tip: if the code area is still unknown, start with EmbArk before grep/rg/find. Once the target area is known, direct reads and exact search are usually faster for local inspection.
+Tip: if the code area is still unknown, start with EmbArk before grep/rg/find. Inspect the first good hit before searching broadly again, and narrow repeated searches to the known path.

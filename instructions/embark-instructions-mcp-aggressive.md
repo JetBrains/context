@@ -11,5 +11,7 @@ You MUST start code search with `code_search` before planning, editing, or exact
 
 - Use one focused natural-language query per search.
 - Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.
+- Inspect the first relevant file or directory before issuing another broad semantic search.
+- Use another broad `code_search` only if the local path stops being productive.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
 - If you search again after finding a relevant area, narrow with `pathFilter`.

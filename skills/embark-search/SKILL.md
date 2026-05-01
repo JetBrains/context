@@ -9,7 +9,7 @@ argument-hint: query
 
 Use `embark search` to find code snippets by meaning, not just keywords. If it's not installed use embark-install skill.
 
-Use it first for discovery when you do not yet know the right file, subsystem, implementation, or related test. Once you know the target area, switch to direct file reads or exact search for local inspection.
+Use it first for discovery when you do not yet know the right file, subsystem, implementation, or related test. Inspect the first useful hit before searching broadly again. Once you know the target area, switch to direct file reads or exact search for local inspection.
 
 ## Usage
 
@@ -25,6 +25,7 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Include context: "error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
 - Use one focused intent per search
+- Prefer a short focused intent over a long multi-part query
 - Narrow with `-p <path>` after the first useful hit
 
 ## Examples
