@@ -1,1 +1,1 @@
-Tip: if you do not yet know the right file, subsystem, or related test, start with EmbArk before grep/rg/find. Inspect the first good hit before searching again, then narrow repeated searches to the known path.
+Tip: if you do not yet have a relevant file open, do one EmbArk search first. Inspect the first plausible hit before searching again, then narrow repeated searches to the known path.

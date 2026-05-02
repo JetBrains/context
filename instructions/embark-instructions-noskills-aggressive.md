@@ -22,11 +22,13 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Include context: "error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
 
+- Do one broad `embark search` first when no relevant file is open yet.
 - Use one focused natural-language query per search.
 - Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.
-- Inspect the first relevant file or directory before issuing another broad semantic search.
-- Use another broad `embark search` only if the local path stops being productive.
+- If the first search returns a plausible file or directory, inspect it before any second `embark search`.
+- Do not issue another broad `embark search` once you have a plausible file or directory.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
+- Use another `embark search` only if the first file or path is not relevant or local inspection stops being productive.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
 
 ### Examples
