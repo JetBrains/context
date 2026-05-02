@@ -9,7 +9,7 @@ argument-hint: query
 
 Use `embark search` to find code snippets by meaning, not just keywords. If it's not installed use embark-install skill.
 
-Use it first for discovery when you do not yet know the right file, subsystem, implementation, or related test. Do one broad search first, inspect the first useful hit before any second broad search, and only search again if that local path stops being productive. Once you know the target area, switch to direct file reads or exact search for local inspection.
+Use it first for discovery when you do not yet know the right file, subsystem, implementation, or related test. Do one broad search first, open one returned file before any second broad search, and only search again if that local path stops being productive. Once you know the target area, switch to direct file reads or exact search for local inspection.
 
 ## Usage
 
@@ -27,7 +27,7 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Use one focused intent per search
 - Make the first query specific to the issue's named feature, class, method, or behavior when available
 - Prefer a short focused intent over a long multi-part query
-- Narrow with `-p <path>` after the first useful hit
+- If you search again, narrow with `-p <path>` taken from the first useful hit
 
 ## Examples
 

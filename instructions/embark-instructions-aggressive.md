@@ -12,8 +12,8 @@ You MUST start code search with `embark search` before planning, editing, or exa
 - Do one broad `embark search` first when no relevant file is open yet.
 - Use one focused natural-language query per search.
 - Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.
-- If the first search returns a plausible file or directory, inspect it before any second `embark search`.
-- Do not issue another broad `embark search` once you have a plausible file or directory.
+- After the first `embark search`, open at least one returned file before any second `embark search`.
+- Do not issue a second broad `embark search` after the first result set.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
-- Use another `embark search` only if the first file or path is not relevant or local inspection stops being productive.
-- If you search again after finding a relevant area, narrow with `-p <path>`.
+- Use another `embark search` only if the first returned file is not relevant or local inspection stops being productive.
+- If you search again, narrow with `-p <path>` taken from the first result area.

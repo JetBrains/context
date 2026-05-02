@@ -1,1 +1,1 @@
-Tip: if you do not yet have a relevant file open, do one EmbArk search first. Inspect the first plausible hit before searching again, then narrow repeated searches to the known path.
+Tip: if you do not yet have a relevant file open, do one EmbArk search first. Open one returned file before searching again, then narrow the second search to the known path.
