@@ -9,6 +9,8 @@ argument-hint: query
 
 Use `embark search` to find code snippets by meaning, not just keywords. If it's not installed use embark-install skill.
 
+Use it as a single semantic bootstrap when the relevant file or subsystem is unknown. Do one broad search, open and inspect at least one returned file locally, and only search again if that local inspection did not surface a relevant file. If you search again, use `embark search -p <path> ...` with the best path from the first result. Do not issue a second broad `embark search`.
+
 ## Usage
 
 ```bash
@@ -22,6 +24,7 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Be descriptive: "function that validates user email addresses" > "email"
 - Include context: "error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
+- Make the first query specific to the issue's named feature, class, method, or behavior when available
 
 ## Examples
 

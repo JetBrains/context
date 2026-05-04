@@ -18,11 +18,16 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Include context: "error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
 
-### When to use semantic search:
-- Understanding unfamiliar codebases or locating specific functionality.
-- Finding implementations, definitions, or usage patterns.
-- Identifying code related to specific features or concepts.
-- Before making changes to understand the context and impact.
+### Single-Shot Policy
+
+Use `embark search` as a semantic bootstrap when the relevant file or subsystem is still unknown.
+
+- If no relevant file is open yet, start with one `embark search`.
+- Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
+- After the first search, open at least one returned file and inspect it locally before any second `embark search`.
+- Exact search and direct file reads are allowed after the first relevant file or path is known.
+- Only search semantically again if inspecting the first returned files did not surface a relevant file.
+- If you search again, use `embark search -p <path> ...` with the most relevant path from the first result. Do not issue a second broad `embark search`.
 
 ### Examples
 
@@ -32,12 +37,6 @@ embark search "user authentication login flow"
 
 # Narrow to specific directory
 embark search -p src/auth "JWT token validation"
-
-# Find callers of a function
-embark search "calls to handleRequest to understand impact"
-
-# Find related tests
-embark search -p test "tests for authentication middleware"
 ```
 
-Use `embark search` proactively when you need to understand code structure or locate relevant implementations.
+Use `embark search` once to get the initial pointer, then continue with local inspection.

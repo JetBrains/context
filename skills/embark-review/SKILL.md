@@ -3,6 +3,8 @@ name: embark-review
 description: "Use this skill to review code changes using semantic search to understand context and impact"
 ---
 
+Use EmbArk as a bootstrap for unknown areas, not as a repeated broad-search loop.
+
 ## When to Use
 
 - Before committing changes to understand what you're about to commit
@@ -23,6 +25,8 @@ git diff main...HEAD        # All changes on current branch
 ```
 
 ### 2. Understand Changed Code Context
+
+For each significantly changed file, use semantic search only when the related area is still unknown. Do one broad search, inspect returned files locally, and retry only if those inspected results were not relevant. Any retry should be narrowed with `-p`.
 
 For each significantly changed file, use semantic search to understand:
 
@@ -60,7 +64,7 @@ git diff --staged
 embark search "authentication middleware pattern"
 
 # Find what calls this middleware
-embark search "uses auth middleware to protect routes"
+embark search -p src/auth "uses auth middleware to protect routes"
 
 # Find related tests
 embark search -p test "auth middleware test"

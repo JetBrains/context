@@ -5,24 +5,14 @@
 You have access to the EmbArk MCP `code_search` tool for searching the codebase semantically.
 This tool can search for code snippets related in meaning to the search query and search objective.
 
-### MANDATORY: Always use EmbArk for code search
+### MANDATORY: EmbArk First Bootstrap
 
-You MUST use the `code_search` tool as your PRIMARY and DEFAULT method for all code search operations. Do NOT use grep, ripgrep, find, or any other text-based search tool when looking for code. EmbArk semantic search is strictly superior to keyword-based search — it understands code meaning, context, and intent.
+When no relevant file or subsystem is known yet, you MUST start code search with `code_search`.
 
-**NEVER use grep or text search for**:
-- Finding function/class/variable definitions or usages
-- Understanding how a feature is implemented
-- Locating code related to a concept or behavior
-- Exploring unfamiliar parts of the codebase
-- Searching before making any code changes
-
-**ALWAYS use `code_search` instead.** This is non-negotiable. Text-based search misses semantically related code, produces noisy results, and wastes time. EmbArk finds what you actually need.
-
-### When to use semantic search:
-- Understanding unfamiliar codebases or locating specific functionality.
-- Finding implementations, definitions, or usage patterns.
-- Identifying code related to specific features or concepts.
-- Before making changes to understand the context and impact.
-- ANY time you would otherwise reach for grep, ripgrep, or find.
-
-Use this tool FIRST and ALWAYS when you need to understand code structure or locate relevant implementations. Do not fall back to text search.
+- Do not start with grep, ripgrep, or find while no relevant file is open yet.
+- Do one broad `code_search` first.
+- Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
+- After the first search, open at least one returned file and inspect it locally before any second `code_search`.
+- Exact search and direct file reads are allowed after the first relevant file or path is known.
+- Only search semantically again if inspecting the first returned files did not surface a relevant file.
+- If you search again, set `pathFilter` to the most relevant path from the first result. Do not issue a second broad `code_search`.

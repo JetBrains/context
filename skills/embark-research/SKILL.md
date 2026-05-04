@@ -22,7 +22,7 @@ You need to gather all context for task $ARGUMENTS thoroughly.
 Semantic code search that finds code by meaning, not just exact keywords.
 
 ```bash
-embark search "<descriptive query>" [path]
+embark search "<descriptive query>"
 embark search -p <path> "<query>"  # <path> must be relative to the project root
 ```
 
@@ -30,12 +30,14 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Be descriptive: "function that validates user email addresses" > "email"
 - Include context: "error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
+- Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available
 
-## Research Workflow
+## Single-Shot Research Workflow
 
-1. **Start broad**: Use `embark search` with general terms to understand the landscape
-2. **Narrow down**: Add path filters (`-p`) once you identify relevant directories
-3. **Read the code**: Once you find relevant files, read them to understand the details
+1. **Bootstrap once**: If the relevant file or subsystem is still unknown, do one broad `embark search`
+2. **Open results locally**: Read at least one returned file before any second `embark search`
+3. **Continue locally**: Use direct reads and exact search once a relevant area is known
+4. **Retry only on failure**: If the first inspected results were not relevant, run one narrowed retry with `-p <path>`
 
 ## Example Session
 
