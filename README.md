@@ -1,6 +1,6 @@
-# EmbArk Skills
+# EmbArk Instructions
 
-A collection of skills, agents, and instructions that integrate EmbArk into agents.
+A collection of skills, agents, and instructions that integrate EmbArk into agents through hooks, MCP and Agents.md
 
 ### Skills
 
