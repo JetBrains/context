@@ -26,9 +26,11 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Do one broad `embark search` first.
 - Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
 - After the first search, open at least one returned file and inspect it locally before any second `embark search`.
-- Exact search and direct file reads are allowed after the first relevant file or path is known.
-- Only search semantically again if inspecting the first returned files did not surface a relevant file.
-- If you search again, use `embark search -p <path> ...` with the most relevant path from the first result. Do not issue a second broad `embark search`.
+- If the first hit is relevant but incomplete, inspect neighboring files locally in that same directory or subsystem before any semantic retry.
+- After the first relevant file or path is known, prefer direct file reads and exact search to inspect nearby code. Do not replace repeated broad semantic search with long grep/find/git exploration loops.
+- A second semantic search is allowed at most once, only after reading at least one returned file, and only if that inspection still did not identify the needed adjacent area.
+- If you search again, use `embark search -p <path> ...` with the directory of the best first hit. Do not issue a second broad `embark search`, and do not reformulate the first broad query into another repository-wide search.
+- Do not use git history for initial discovery unless the task explicitly requires regression or history analysis.
 
 ### Examples
 
@@ -40,4 +42,4 @@ embark search "user authentication login flow"
 embark search -p src/auth "JWT token validation"
 ```
 
-Use `embark search` once to get the initial pointer, then continue with local inspection.
+Use `embark search` once to get the initial pointer, then inspect nearby code locally. If that still fails, do one narrowed retry with `-p`.

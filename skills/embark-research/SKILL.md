@@ -36,8 +36,8 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 1. **Bootstrap once**: If the relevant file or subsystem is still unknown, do one broad `embark search`
 2. **Open results locally**: Read at least one returned file before any second `embark search`
-3. **Continue locally**: Use direct reads and exact search once a relevant area is known
-4. **Retry only on failure**: If the first inspected results were not relevant, run one narrowed retry with `-p <path>`
+3. **Look sideways locally**: If the first hit is relevant but incomplete, inspect neighboring files in the same directory or subsystem with direct reads and exact search
+4. **Retry only on failure**: If that local inspection still did not identify the needed adjacent area, run at most one narrowed retry with `-p <path>` using the best first hit's directory
 
 ## Example Session
 
