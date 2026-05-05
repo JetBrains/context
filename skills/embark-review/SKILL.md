@@ -32,28 +32,16 @@ For each significantly changed file, use semantic search to understand:
 
 ```bash
 # Find similar patterns
-embark search "<code chunk that was changed>" --reranker
+embark search "<code chunk that was changed>"
 
 # Find callers of a modified function
-embark search "calls to <function name> to understand impact" --reranker
+embark search "calls to <function name> to understand impact"
 
-# Find related test files
+# Find related test files in the "test/" directory (path must be relative to the project root)
 embark search -p test "tests for <feature being modified>"
 ```
 
-### 3. Check Historical Context
-
-Understand why the code was written this way:
-
-```bash
-# Find related commits
-embark history "changes to <feature name>"
-
-# Find bug fixes in this area
-embark history "fix <area being modified>"
-```
-
-### 4. Review Checklist
+### 3. Review Checklist
 
 For each change, verify:
 
@@ -73,9 +61,6 @@ embark search "authentication middleware pattern"
 
 # Find what calls this middleware
 embark search "uses auth middleware to protect routes"
-
-# Check if there were related bug fixes
-embark history "fix auth middleware"
 
 # Find related tests
 embark search -p test "auth middleware test"
