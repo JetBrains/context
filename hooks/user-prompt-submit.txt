@@ -1,1 +1,1 @@
-Tip: when you need to locate code in this repo, try `embark code_search` (or the `code_search` MCP tool) before grep/rg/find. Semantic search tends to surface the right files in fewer turns.
+Tip: when you need to locate code in this repo, try `embark code_search` before grep/rg/find. Semantic search CLI tends to surface the right files in fewer turns.
