@@ -176,7 +176,7 @@ case "$TOOL_NAME" in
     fi
 
     if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
-      if [[ "$COMMAND" =~ (^|[[:space:]])git[[:space:]]+(log|show|blame)\b ]]; then
+      if [[ "$COMMAND" =~ (^|[[:space:]])git[[:space:]]+(log|show|blame)([[:space:]]|$) ]]; then
         deny "Do not use git history for initial discovery. Start with semantic bootstrap, then inspect nearby code locally."
       fi
     fi
