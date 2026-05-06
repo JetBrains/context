@@ -195,11 +195,17 @@ case "$TOOL_NAME" in
       exit 0
     fi
 
-    if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
-      if [[ "$COMMAND" =~ (^|[[:space:]])(rg|grep|find)([[:space:]]|$) ]]; then
+    if [[ "$COMMAND" =~ (^|[[:space:]])(rg|grep|find)([[:space:]]|$) ]]; then
+      if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
         deny "Do not start broad local discovery before semantic bootstrap. Use one broad EmbArk search first when the relevant area is still unknown."
       fi
 
+      if [[ "$READ_AFTER_BOOTSTRAP" != "true" ]]; then
+        deny "Read at least one returned file from the bootstrap search before switching to local search tools."
+      fi
+    fi
+
+    if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
       if [[ "$COMMAND" =~ (^|[[:space:]])git[[:space:]]+(log|show|blame)\b ]]; then
         deny "Do not use git history for initial discovery. Start with semantic bootstrap, then inspect nearby code locally."
       fi
