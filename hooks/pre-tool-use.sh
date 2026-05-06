@@ -28,6 +28,23 @@ read_state() {
   jq -r ".$field" "$STATE_FILE"
 }
 
+write_state_expr() {
+  local expr="$1"
+  jq "$expr" "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
+}
+
+deny() {
+  local reason="$1"
+  jq -n --arg reason "$reason" '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: $reason
+    }
+  }'
+  exit 0
+}
+
 sync_state_from_transcript() {
   if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
     return
@@ -72,12 +89,28 @@ def iter_tool_uses(event):
             yield block
 
 
+def iter_tool_results(event):
+    if event.get("type") != "user":
+        return
+    message = event.get("message")
+    if not isinstance(message, dict):
+        return
+    content = message.get("content")
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_result":
+            yield block
+
+
 last_prompt_idx = -1
 for i, event in enumerate(events):
     if is_user_prompt(event):
         last_prompt_idx = i
 
 current_turn = events[last_prompt_idx + 1 :] if last_prompt_idx >= 0 else events
+
+tool_results_by_id = {}
 
 state = {
     "bootstrap_done": False,
@@ -96,37 +129,29 @@ for event in current_turn:
 
         if name == "Bash":
             command = input_obj.get("command", "")
-            if isinstance(command, str) and "embark search" in command:
-                bootstrap_seen = True
-                state["bootstrap_done"] = True
+            if not isinstance(command, str) or "embark search" not in command:
+                continue
 
-                if " -p " in command:
-                    state["narrow_search_count"] += 1
-                    if state["broad_search_count"] > 0 or state["narrow_search_count"] > 1:
-                        state["narrowed_retry_used"] = True
-                else:
-                    state["broad_search_count"] += 1
+            bootstrap_seen = True
+            state["bootstrap_done"] = True
+
+            if " -p " in command:
+                state["narrow_search_count"] += 1
+                if state["broad_search_count"] > 0 or state["narrow_search_count"] > 1:
+                    state["narrowed_retry_used"] = True
+            else:
+                state["broad_search_count"] += 1
 
         elif name == "Read" and bootstrap_seen:
             file_path = input_obj.get("file_path", "")
-            if isinstance(file_path, str) and file_path:
-                state["read_after_bootstrap"] = True
+            if not isinstance(file_path, str) or not file_path:
+                continue
+
+            state["read_after_bootstrap"] = True
 
 print(json.dumps(state))
 PY
   mv "${STATE_FILE}.tmp" "$STATE_FILE"
-}
-
-deny() {
-  local reason="$1"
-  jq -n --arg reason "$reason" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: $reason
-    }
-  }'
-  exit 0
 }
 
 if [[ ! -f "$STATE_FILE" ]]; then
@@ -146,6 +171,7 @@ case "$TOOL_NAME" in
     if [[ "$COMMAND" == *"embark search"* ]]; then
       if [[ "$COMMAND" == *" -p "* ]]; then
         if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
+          write_state_expr '.bootstrap_done = true | .narrow_search_count += 1'
           exit 0
         fi
 
@@ -156,12 +182,16 @@ case "$TOOL_NAME" in
         if [[ "$NARROWED_RETRY_USED" == "true" ]]; then
           deny "The narrowed semantic retry has already been used. Continue from the files and directories you have already identified instead of issuing another EmbArk search."
         fi
+
+        write_state_expr '.narrowed_retry_used = true | .narrow_search_count += 1'
         exit 0
       fi
 
       if [[ "$BOOTSTRAP_DONE" == "true" ]]; then
         deny "Do not issue a second broad EmbArk search. Read a returned file first, inspect nearby code locally, and if a retry is still needed use \`embark search -p <path> ...\`."
       fi
+
+      write_state_expr '.bootstrap_done = true | .broad_search_count += 1'
       exit 0
     fi
 
@@ -176,7 +206,7 @@ case "$TOOL_NAME" in
     fi
 
     if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
-      if [[ "$COMMAND" =~ (^|[[:space:]])git[[:space:]]+(log|show|blame)([[:space:]]|$) ]]; then
+      if [[ "$COMMAND" =~ (^|[[:space:]])git[[:space:]]+(log|show|blame)\b ]]; then
         deny "Do not use git history for initial discovery. Start with semantic bootstrap, then inspect nearby code locally."
       fi
     fi
@@ -188,6 +218,11 @@ case "$TOOL_NAME" in
 
     if [[ "$READ_AFTER_BOOTSTRAP" != "true" ]]; then
       deny "Read at least one returned file from the bootstrap search before switching to local search tools."
+    fi
+    ;;
+  Read)
+    if [[ "$BOOTSTRAP_DONE" == "true" && "$READ_AFTER_BOOTSTRAP" != "true" ]]; then
+      write_state_expr '.read_after_bootstrap = true'
     fi
     ;;
 esac
