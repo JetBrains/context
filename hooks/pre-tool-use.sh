@@ -4,6 +4,7 @@ set -euo pipefail
 INPUT="$(cat)"
 SESSION_ID="$(jq -r '.session_id // empty' <<<"$INPUT")"
 TOOL_NAME="$(jq -r '.tool_name // empty' <<<"$INPUT")"
+TRANSCRIPT_PATH="$(jq -r '.transcript_path // empty' <<<"$INPUT")"
 
 if [[ -z "$SESSION_ID" || -z "$TOOL_NAME" ]]; then
   exit 0
@@ -27,6 +28,95 @@ read_state() {
   jq -r ".$field" "$STATE_FILE"
 }
 
+sync_state_from_transcript() {
+  if [[ -z "$TRANSCRIPT_PATH" || ! -f "$TRANSCRIPT_PATH" ]]; then
+    return
+  fi
+
+  python3 - "$TRANSCRIPT_PATH" > "${STATE_FILE}.tmp" <<'PY'
+import json
+import sys
+
+transcript_path = sys.argv[1]
+events = []
+with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            events.append(obj)
+
+
+def is_user_prompt(event):
+    if event.get("type") != "user":
+        return False
+    message = event.get("message")
+    if not isinstance(message, dict):
+        return False
+    return isinstance(message.get("content"), str)
+
+
+def iter_tool_uses(event):
+    if event.get("type") != "assistant":
+        return
+    message = event.get("message")
+    if not isinstance(message, dict):
+        return
+    for block in message.get("content", []):
+        if isinstance(block, dict) and block.get("type") == "tool_use":
+            yield block
+
+
+last_prompt_idx = -1
+for i, event in enumerate(events):
+    if is_user_prompt(event):
+        last_prompt_idx = i
+
+current_turn = events[last_prompt_idx + 1 :] if last_prompt_idx >= 0 else events
+
+state = {
+    "bootstrap_done": False,
+    "read_after_bootstrap": False,
+    "narrowed_retry_used": False,
+    "broad_search_count": 0,
+    "narrow_search_count": 0,
+}
+
+bootstrap_seen = False
+
+for event in current_turn:
+    for block in iter_tool_uses(event):
+        name = block.get("name")
+        input_obj = block.get("input") or {}
+
+        if name == "Bash":
+            command = input_obj.get("command", "")
+            if isinstance(command, str) and "embark search" in command:
+                bootstrap_seen = True
+                state["bootstrap_done"] = True
+
+                if " -p " in command:
+                    state["narrow_search_count"] += 1
+                    if state["broad_search_count"] > 0 or state["narrow_search_count"] > 1:
+                        state["narrowed_retry_used"] = True
+                else:
+                    state["broad_search_count"] += 1
+
+        elif name == "Read" and bootstrap_seen:
+            file_path = input_obj.get("file_path", "")
+            if isinstance(file_path, str) and file_path:
+                state["read_after_bootstrap"] = True
+
+print(json.dumps(state))
+PY
+  mv "${STATE_FILE}.tmp" "$STATE_FILE"
+}
+
 deny() {
   local reason="$1"
   jq -n --arg reason "$reason" '{
@@ -42,6 +132,8 @@ deny() {
 if [[ ! -f "$STATE_FILE" ]]; then
   init_state
 fi
+
+sync_state_from_transcript
 
 BOOTSTRAP_DONE="$(read_state bootstrap_done)"
 READ_AFTER_BOOTSTRAP="$(read_state read_after_bootstrap)"
