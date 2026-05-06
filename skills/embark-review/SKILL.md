@@ -26,7 +26,7 @@ git diff main...HEAD        # All changes on current branch
 
 ### 2. Understand Changed Code Context
 
-For each significantly changed file, use semantic search only when the related area is still unknown. Do one broad search, inspect returned files locally, and inspect nearby files in the same directory before any retry. If that still fails, do at most one narrowed retry with `-p`. Do not reformulate the first broad query into another repository-wide search.
+For each significantly changed file, use semantic search only when the related area is still unknown. Do one broad search, inspect returned files locally, and inspect nearby files in the same directory before any retry. If that still fails, do a narrowed retry with `-p`.
 
 For each significantly changed file, use semantic search to understand:
 

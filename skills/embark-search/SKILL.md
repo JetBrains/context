@@ -9,7 +9,7 @@ argument-hint: query
 
 Use `embark search` to find code snippets by meaning, not just keywords. If it's not installed use embark-install skill.
 
-Use it as a single semantic bootstrap when the relevant file or subsystem is unknown. Do one broad search, open and inspect at least one returned file locally, and inspect nearby code in that same directory or subsystem before any retry. If that still does not identify the needed adjacent area, do at most one narrowed retry with `embark search -p <path> ...` using the directory of the best first hit. Do not issue a second broad `embark search`.
+Use it as a single semantic bootstrap when the relevant file or subsystem is unknown. Do one broad search, open and inspect at least one returned file locally, and inspect nearby code in that same directory or subsystem before any retry. If that still does not identify the needed adjacent area, do a narrowed retry with `embark search -p <path> ...` using the directory of the best first hit.
 
 ## Usage
 
