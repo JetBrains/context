@@ -87,12 +87,17 @@ case "$TOOL_NAME" in
       fi
     fi
     ;;
-  Grep|Glob)
+  Grep)
     if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
       deny "Do not start broad local discovery before semantic bootstrap. Use one broad EmbArk search first when the relevant area is still unknown."
     fi
 
     if [[ "$READ_AFTER_BOOTSTRAP" != "true" ]]; then
+      deny "Read at least one returned file from the bootstrap search before switching to local search tools."
+    fi
+    ;;
+  Glob)
+    if [[ "$BOOTSTRAP_DONE" == "true" && "$READ_AFTER_BOOTSTRAP" != "true" ]]; then
       deny "Read at least one returned file from the bootstrap search before switching to local search tools."
     fi
     ;;
