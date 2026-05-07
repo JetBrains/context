@@ -17,7 +17,7 @@ jq -n '{
   narrowed_retry_used: false
 }' > "$STATE_FILE"
 
-CONTEXT="Workflow: if the relevant file or subsystem is unknown, start with one broad EmbArk bootstrap search. Then read at least one returned file and inspect nearby files in that same directory or subsystem with local tools. If that still does not identify the needed adjacent area, do a narrowed semantic retry: on CLI use \`embark search -p <path> ...\`, and on MCP set \`pathFilter\`."
+CONTEXT="Workflow: if the relevant file or subsystem is still unclear, use semantic search before broad local discovery. After a semantic result, read at least one returned file before expanding locally with nearby files in that same directory or subsystem. If another semantic search is still needed, narrow it: on CLI use \`embark search -p <path> ...\`, and on MCP set \`pathFilter\`."
 
 jq -n --arg ctx "$CONTEXT" '{
   hookSpecificOutput: {
