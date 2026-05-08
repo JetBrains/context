@@ -9,7 +9,7 @@ It finds code by meaning, not just keywords.
 
 ```bash
 embark search "<detailed and descriptive query>"
-embark search -p <path> "<query>"
+embark search -p <path> "<query>"  # <path> must be relative to the project root
 ```
 
 ### Query Tips
