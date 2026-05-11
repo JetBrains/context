@@ -26,7 +26,7 @@ Use this skill to research `$ARGUMENTS` across all available repositories, espec
 1. **Find candidate repositories first.** Run the experimental repo discovery command before searching code:
 
 ```bash
-embark repo "<repo or domain terms>" --json-output --limit 30
+embark repo "<repo or domain terms>" --limit 30
 ```
 
 Use short, discriminative repo terms from the request: product names, service names, team names, package names, or explicit repository names.
@@ -37,6 +37,10 @@ Use short, discriminative repo terms from the request: product names, service na
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
 - Preserve the exact repository `id` returned by `embark repo`; do not infer ids from names.
+
+```
+embark repo "jcp-" # show all repos started with jcp- prefix
+```
 
 3. **Select suitable repos.** Prefer exact name matches, prefix-family matches, and repos whose description/path/language matches the task. If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
 
