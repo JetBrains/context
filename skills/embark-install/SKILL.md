@@ -1,39 +1,79 @@
 ---
 name: embark-install
-description: "Install the Embark CLI tool. Use when embark commands fail with 'command not found' or when the user asks to install Embark."
+description: Install Embark and complete first-time setup — login, index the project, and configure agent integration. Use when `embark` is not found or the user asks to install Embark.
 ---
 
-## Install Embark CLI
+# Install and set up Embark
 
-Run the appropriate command for the user's platform:
+Use this skill to install the Embark CLI and finish first-time setup (login, project index, agent integration).
+
+## When to use
+
+- `embark` returns `command not found`
+- The user says Embark is not installed
+- The user explicitly asks to install Embark
+
+## Do not use for
+
+- Authentication issues → use `embark login`
+- Missing project index → use `embark index`
+- Agent integration only → use `embark setup-agent --help`
+
+## Install
 
 ### macOS / Linux
 
 ```bash
-curl -fsSL embark.labs.jb.gg/install.sh | bash
+curl -fsSL https://packages.jetbrains.team/files/p/grazi/jetbrains-ai-public-releases/embark/download-embark.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://embark.labs.jb.gg/install.ps1 | iex
+irm https://packages.jetbrains.team/files/p/grazi/jetbrains-ai-public-releases/embark/download-embark.ps1 | iex
 ```
 
-### Errors: 401
+## Verify installation
 
-Means the user is not logged in.
-```
-Call `embark login` to login 
+```bash
+embark --version
 ```
 
-### Errors: 404
+## Common follow-ups
 
-Means there's no index on the server. 
+### `401`
+
+The user is not logged in.
+
+```bash
+embark login
 ```
+
+### `404`
+
+There is no index on the server.
+
+```bash
 embark index
 ```
 
-## When to Use
+### Agent setup
 
-- The `embark` command is not found
-- User explicitly asks to install Embark
+If the user also wants Embark configured for an agent, use `embark setup-agent`.
+
+Claude non-interactive setup:
+
+```bash
+embark setup-agent --agent=CLAUDE --auto --non-interactive
+```
+
+Codex non-interactive setup:
+
+```bash
+embark setup-agent --agent=CODEX --auto --non-interactive
+```
+
+Study help for any other agents and options:
+```aiignore
+embark setup-agent --help
+```
