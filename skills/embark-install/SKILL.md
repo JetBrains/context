@@ -1,11 +1,11 @@
 ---
 name: embark-install
-description: Install Embark and complete first-time setup — login, index the project, and configure agent integration. Use when `embark` is not found or the user asks to install Embark.
+description: Install Embark and complete first-time setup — login and configure agent integration. Use when `embark` is not found or the user asks to install Embark.
 ---
 
 # Install and set up Embark
 
-Use this skill to install the Embark CLI and finish first-time setup (login, project index, agent integration).
+Use this skill to install the Embark CLI and finish first-time setup (login, agent integration).
 
 ## When to use
 
