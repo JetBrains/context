@@ -7,16 +7,7 @@ It finds code by meaning, not just keywords.
 
 ### MANDATORY: Always use EmbArk for code search
 
-You MUST use `embark search` as your PRIMARY and DEFAULT method for all code search operations. Do NOT use grep, ripgrep, find, or any other text-based search tool when looking for code. EmbArk semantic search is strictly superior to keyword-based search — it understands code meaning, context, and intent.
-
-**NEVER use grep or text search for**:
-- Finding function/class/variable definitions or usages
-- Understanding how a feature is implemented
-- Locating code related to a concept or behavior
-- Exploring unfamiliar parts of the codebase
-- Searching before making any code changes
-
-**ALWAYS use `embark search` instead.** This is non-negotiable. Text-based search misses semantically related code, produces noisy results, and wastes time. EmbArk finds what you actually need.
+You MUST start code search with `embark search` before planning, editing, or exact search when you do not yet know the right file, subsystem, implementation, or related test. This is the default entry point for unfamiliar-code discovery.
 
 ### Usage
 
@@ -31,12 +22,12 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 - Include context: "error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
 
-### When to use semantic search:
-- Understanding unfamiliar codebases or locating specific functionality.
-- Finding implementations, definitions, or usage patterns.
-- Identifying code related to specific features or concepts.
-- Before making changes to understand the context and impact.
-- ANY time you would otherwise reach for grep, ripgrep, or find.
+- Use one focused natural-language query per search.
+- Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.
+- Inspect the first relevant file or directory before issuing another broad semantic search.
+- Use another broad `embark search` only if the local path stops being productive.
+- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
+- If you search again after finding a relevant area, narrow with `-p <path>`.
 
 ### Examples
 
@@ -54,4 +45,4 @@ embark search "calls to handleRequest to understand impact"
 embark search -p test "tests for authentication middleware"
 ```
 
-Use `embark search` FIRST and ALWAYS when you need to understand code structure or locate relevant implementations. Do not fall back to text search.
+Use `embark search` first for discovery, inspect the first good hit, then move to exact/local inspection once the target area is known.
