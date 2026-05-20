@@ -2,8 +2,8 @@
 
 ## Semantic Code Search (EmbArk)
 
-You have access to `embark search` for searching the codebase semantically.
-Use the `/embark-search` skill or run `embark search "<query>"` to find code by meaning, not just keywords.
+For a targeted semantic search, use `embark search` command or `/embark-search` skill — it matches by meaning, not keywords.
+For broader codebase exploration or multiple questions, delegate to the `embark-explore` subagent.
 
 ### Single-Shot Policy
 
