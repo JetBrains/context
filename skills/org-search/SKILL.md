@@ -52,7 +52,14 @@ embark search --repository-id "<repo-id>" --json-output --limit 10 "<semantic se
 
 If `embark search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `embark repo`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Synthesize across repositories.** Report which repos were searched, which repos had useful matches, and the strongest files/symbols found. If no suitable repo is found, say which repo filters were tried before stopping.
+5. **Resolve snippets and repo information with `gh`.** When `embark search` returns promising snippets, use the GitHub CLI to fetch full file context, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `embark repo` when available.
+
+```bash
+gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,url
+gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/vnd.github.raw"
+```
+
+6. **Synthesize across repositories.** Report which repos were searched, which repos had useful matches, and the strongest files/symbols found. If no suitable repo is found, say which repo filters were tried before stopping.
 
 ## Search Guidance
 
@@ -60,3 +67,4 @@ If `embark search --help` shows a different repository-id flag, use that flag, b
 - Re-run `embark repo` with narrower or prefix-aware terms before broadening code search.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
+- Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.
