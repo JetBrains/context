@@ -22,23 +22,31 @@ Use this skill to research `$ARGUMENTS` across all available repositories when t
 
 ## Workflow
 
-1. **Find candidate repositories first.** Run the experimental repo discovery command before searching code:
+0. **Gather possible dependencies, make a discovery about the current project how it can be consumed**
+
+1. **Find candidate repositories first.** Run the experimental repo discovery command:
 
 ```bash
-embark repo "<repo or system terms>" --limit 30
+embark repos "<repo or system terms>" --limit 30
 ```
 
-Use short, discriminative terms from the request: service names, endpoint names, schema names, event/topic names, package names, team names, product names, or explicit repository names.
+Use short, discriminative terms from the request: service names, endpoint names, schema names, event/topic names, package names, team names, product names, or explicit repository names. The shorter the better.
+
+You can omit query completely.
+
+```
+embark repos
+```
 
 2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
 
 - Query the prefix literally, for example `jcp` and `jcp-`.
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
-- Preserve the exact repository `id` returned by `embark repo`; do not infer ids from names.
+- Preserve the exact repository `id` returned by `embark repos`; do not infer ids from names.
 
 ```
-embark repo "jcp-" # show all repos started with jcp- prefix
+embark repos "jcp-" # Example: show all repos started with jcp- prefix
 ```
 
 3. **Select suitable repos.** Prefer exact owner repos, exact consumer/producer repos, prefix-family matches, and repos whose description/path/language/domain matches the changed surface. If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
@@ -49,7 +57,7 @@ embark repo "jcp-" # show all repos started with jcp- prefix
 embark search --repository-id "<repo-id>" --json-output --limit 10 "<semantic blast-radius search query>"
 ```
 
-If `embark search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `embark repo`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
+If `embark search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `embark repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
 5. **Resolve snippets and repo information with `gh`.** When `embark search` returns promising snippets, use the GitHub CLI to fetch full source files, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `embark repo` when available.
 

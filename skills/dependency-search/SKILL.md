@@ -3,7 +3,7 @@ name: dependency-search
 context: fork
 agent: Explore
 argument-hint: dependency query
-description: "Experimental Embark org-wide dependency search across multiple repositories. Use when Codex needs to find where packages, libraries, modules, imports, dependency versions, or dependency configuration are used across repos for upgrades, removals, CVEs, migrations, or ownership discovery."
+description: "Experimental Embark org-wide dependency search across multiple repositories. Use when need to find APIs in other repositories, or dependency configuration are used across repos for upgrades, removals, CVEs, migrations, or ownership discovery."
 ---
 
 Use this skill to research `$ARGUMENTS` across all available repositories when the question is about dependency usage, dependency ownership, upgrade planning, migration scope, version drift, or remediation.
@@ -25,7 +25,7 @@ Use this skill to research `$ARGUMENTS` across all available repositories when t
 1. **Find candidate repositories first.** Run the experimental repo discovery command before searching code:
 
 ```bash
-embark repo "<repo or dependency terms>" --limit 30
+embark repos "<repo or dependency terms>" --limit 30
 ```
 
 Use short, discriminative terms from the request: package names, module names, framework names, SDK names, team names, service names, or explicit repository names.
@@ -38,20 +38,22 @@ Use short, discriminative terms from the request: package names, module names, f
 - Preserve the exact repository `id` returned by `embark repo`; do not infer ids from names.
 
 ```
-embark repo "jcp-" # show all repos started with jcp- prefix
+embark repos "jcp-" # show all repos started with jcp- prefix
 ```
+
+You can omit query completely.
 
 3. **Select suitable repos.** Prefer exact dependency-owner repos, exact service matches, prefix-family matches, and repos whose description/path/language/package ecosystem matches the task. If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
 
-4. **Search selected repos in parallel.** Invoke `embark search` once per selected repository, passing the repository id from `embark repo` with the id option supported by the installed experimental CLI:
+4. **Search selected repos in parallel.** Invoke `embark search` once per selected repository, passing the repository id from `embark repos` with the id option supported by the installed experimental CLI:
 
 ```bash
 embark search --repository-id "<repo-id>" --json-output --limit 10 "<semantic dependency search query>"
 ```
 
-If `embark search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `embark repo`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
+If `embark search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `embark repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Resolve snippets and repo information with `gh`.** When `embark search` returns promising snippets, use the GitHub CLI to fetch full manifests, lockfiles, source files, surrounding code, default branch, repo metadata, owners, recent commits, or related dependency PRs/issues before relying on the match. Use the GitHub owner/name or URL from `embark repo` when available.
+5. **Resolve snippets and repo information with `gh`.** When `embark search` returns promising snippets, use the GitHub CLI to fetch full manifests, lockfiles, source files, surrounding code, default branch, repo metadata, owners, recent commits, or related dependency PRs/issues before relying on the match. Use the GitHub owner/name or URL from `embark repos` when available.
 
 ```bash
 gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,url
@@ -65,7 +67,7 @@ gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/
 - Use semantic, behavior-focused queries for `embark search`; avoid one-word searches.
 - Include ecosystem-specific terms when useful, such as manifest names, package manager names, import namespaces, generated client names, runtime names, or version strings.
 - Search both declarations and runtime usage; dependency manifests alone can miss generated, vendored, plugin, or transitive usage.
-- Re-run `embark repo` with narrower or prefix-aware terms before broadening code search.
+- Re-run `embark repos` with narrower or prefix-aware terms before broadening code search.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
 - Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.
