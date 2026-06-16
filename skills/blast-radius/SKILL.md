@@ -34,16 +34,16 @@ Use this skill to research `$ARGUMENTS` across all available repositories when t
 ```markdown
 <!-- blast-radius-repos-start -->
 ## Blast-radius external repositories
-| Name | repository-id | owner/repo | When relevant |
-|------|---------------|------------|---------------|
-| payments-api | <exact-repository-id> | acme/payments-api | Owns `/payments` REST + payment events; pick for any payment contract/schema change |
+| Name | git-remote-url | owner/repo | When relevant |
+|------|----------------|------------|---------------|
+| payments-api | github.com/acme/payments-api | acme/payments-api | Owns `/payments` REST + payment events; pick for any payment contract/schema change |
 <!-- blast-radius-repos-end -->
 ```
 
    When the section exists:
 
 - Match rows by their `When relevant` trigger against the change being analyzed.
-- Use the exact `repository-id` from the matching rows for `embark search` (step 4) — do not look these ids up again or infer them from names.
+- Use the exact `git-remote-url` from the matching rows for `embark search` (step 4) — do not look these values up again or infer them from names.
 
    **Fall back to `embark repos` discovery only when the project has no such section, or it has no row relevant to the change** (and to sanity-check that the list is not missing an obvious candidate). The experimental repo discovery command:
 
@@ -59,14 +59,14 @@ You can omit query completely.
 embark repos
 ```
 
-Note: `embark repos` matches **repository names by substring** and returns an opaque `repository.id` hash — this is exactly why the project's curated list takes priority for known producers/consumers. To populate the list, find a repo's exact id with `embark repos "<terms>" --json-output` and copy its `repository.id` into a new row.
+Note: `embark repos` matches **repository names by substring** and returns each repo's `repository` git-remote-url (e.g. `github.com/jetbrains/embark`) — this is the exact value `embark search --git-remote-url` expects. To populate the curated list, find a repo with `embark repos "<terms>" --json-output` and copy its `repository` value into a new row.
 
 2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
 
 - Query the prefix literally, for example `jcp` and `jcp-`.
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
-- Preserve the exact repository `id` returned by `embark repos`; do not infer ids from names.
+- Preserve the exact `repository` git-remote-url returned by `embark repos`; do not infer it from names.
 
 ```
 embark repos "jcp-" # Example: show all repos started with jcp- prefix
@@ -74,13 +74,13 @@ embark repos "jcp-" # Example: show all repos started with jcp- prefix
 
 3. **Select suitable repos.** Start from the rows whose `When relevant` triggers matched in the project's curated list, then add any exact owner/consumer/producer repos, prefix-family matches, and repos whose description/path/language/domain matches the changed surface (from the fallback `embark repos` discovery). If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
 
-4. **Search selected repos in parallel.** Invoke `embark search` once per selected repository, passing the repository id (the exact `repository-id` from the project's curated list, or the id from `embark repos` for fallback candidates) with the id option supported by the installed experimental CLI:
+4. **Search selected repos in parallel.** Invoke `embark search` once per selected repository, passing the repo's git-remote-url (the exact `git-remote-url` from the project's curated list, or the `repository` value from `embark repos` for fallback candidates) via the `--git-remote-url` option:
 
 ```bash
-embark search --repository-id "<repo-id>" --json-output --limit 10 "<semantic blast-radius search query>"
+embark search --git-remote-url "<repo-git-remote-url>" --json-output --limit 10 "<semantic blast-radius search query>"
 ```
 
-If `embark search --help` shows a different repository-id flag, use that flag, but still pass the exact id from the project's curated list or `embark repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
+Run `embark search --help` to confirm the flag for the installed experimental CLI if `--git-remote-url` is rejected, but still pass the exact git-remote-url from the project's curated list or `embark repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
 5. **Resolve snippets and repo information with `gh`.** When `embark search` returns promising snippets, use the GitHub CLI to fetch full source files, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `embark repo` when available.
 
