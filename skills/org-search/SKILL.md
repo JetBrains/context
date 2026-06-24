@@ -39,7 +39,7 @@ Use short, discriminative repo terms from the request: product names, service na
 - Preserve the exact repository `id` returned by `embark repos`; do not infer ids from names.
 
 ```
-embark repo "jcp-" # show all repos started with jcp- prefix
+embark repos "jcp-" # show all repos started with jcp- prefix
 ```
 
 You can omit query completely.
