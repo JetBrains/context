@@ -1,9 +1,9 @@
 ---
-name: embark-research
+name: context-research
 context: fork
 agent: Explore
 argument-hint: query
-description: "Research and understand unfamiliar codebases using semantic search with `embark search`"
+description: "Research and understand unfamiliar codebases using semantic search with `context search`"
 ---
 
 You need to gather all context for task $ARGUMENTS thoroughly.
@@ -17,13 +17,13 @@ You need to gather all context for task $ARGUMENTS thoroughly.
 
 ## Tools Available
 
-### `embark search`
+### `context search`
 
 Semantic code search that finds code by meaning, not just exact keywords.
 
 ```bash
-embark search "<descriptive query>" [path]
-embark search -p <path> "<query>"  # <path> must be relative to the project root
+context search "<descriptive query>" [path]
+context search -p <path> "<query>"  # <path> must be relative to the project root
 ```
 
 **Query Tips:**
@@ -33,7 +33,7 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 ## Research Workflow
 
-1. **Start broad**: Use `embark search` with general terms to understand the landscape
+1. **Start broad**: Use `context search` with general terms to understand the landscape
 2. **Narrow down**: Add path filters (`-p`) once you identify relevant directories
 3. **Read the code**: Once you find relevant files, read them to understand the details
 
@@ -41,8 +41,8 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 ```bash
 # Find authentication-related code
-embark search "user authentication login"
+context search "user authentication login"
 
 # Narrow to specific directory
-embark search -p src/auth "JWT token validation"
+context search -p src/auth "JWT token validation"
 ```

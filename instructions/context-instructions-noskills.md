@@ -1,15 +1,15 @@
 # Tools
 
-## Semantic Code Search (EmbArk)
+## Semantic Code Search (Context)
 
-You have access to `embark search` for searching the codebase semantically.
+You have access to `context search` for searching the codebase semantically.
 It finds code by meaning, not just keywords.
 
 ### Usage
 
 ```bash
-embark search "<detailed and descriptive query>"
-embark search -p <path> "<query>"  # <path> must be relative to the project root
+context search "<detailed and descriptive query>"
+context search -p <path> "<query>"  # <path> must be relative to the project root
 ```
 
 ### Query Tips
@@ -20,11 +20,11 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 ### How to use it
 
-- Start with `embark search` before planning, editing, or exact search in unfamiliar code when you do not yet know the right file, subsystem, implementation, or related test.
+- Start with `context search` before planning, editing, or exact search in unfamiliar code when you do not yet know the right file, subsystem, implementation, or related test.
 - Use one focused natural-language query per search.
 - Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
 - Inspect the first relevant file or directory before issuing another broad semantic search.
-- Use another broad `embark search` only if the local path stops being productive.
+- Use another broad `context search` only if the local path stops being productive.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
 
@@ -32,16 +32,16 @@ embark search -p <path> "<query>"  # <path> must be relative to the project root
 
 ```bash
 # Find authentication-related code
-embark search "user authentication login flow"
+context search "user authentication login flow"
 
 # Narrow to specific directory
-embark search -p src/auth "JWT token validation"
+context search -p src/auth "JWT token validation"
 
 # Find callers of a function
-embark search "calls to handleRequest to understand impact"
+context search "calls to handleRequest to understand impact"
 
 # Find related tests
-embark search -p test "tests for authentication middleware"
+context search -p test "tests for authentication middleware"
 ```
 
-Use `embark search` for discovery, inspect the first good hit, then move to exact/local inspection once the target area is known.
+Use `context search` for discovery, inspect the first good hit, then move to exact/local inspection once the target area is known.
