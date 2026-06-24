@@ -39,7 +39,7 @@ Use short, discriminative repo terms from the request: product names, service na
 - Preserve the exact repository `id` returned by `context repos`; do not infer ids from names.
 
 ```
-context repo "jcp-" # show all repos started with jcp- prefix
+context repos "jcp-" # show all repos started with jcp- prefix
 ```
 
 You can omit query completely.

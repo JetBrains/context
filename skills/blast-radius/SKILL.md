@@ -24,7 +24,28 @@ Use this skill to research `$ARGUMENTS` across all available repositories when t
 
 0. **Gather possible dependencies, make a discovery about the current project how it can be consumed**
 
-1. **Find candidate repositories first.** Run the experimental repo discovery command:
+1. **Read the project's curated repo list first.** Each project may pin a hand-maintained list of external repositories in its agent instruction file. Read it before anything else and treat it as the **primary** source of candidate repos. Look in the current project, in this order, and use the first one that contains the list section:
+
+- `CLAUDE.md`
+- `AGENTS.md`
+
+   The list lives in a section delimited by these markers (anywhere in the file):
+
+```markdown
+<!-- blast-radius-repos-start -->
+## Blast-radius external repositories
+| Name | git-remote-url | owner/repo | When relevant |
+|------|----------------|------------|---------------|
+| payments-api | github.com/acme/payments-api | acme/payments-api | Owns `/payments` REST + payment events; pick for any payment contract/schema change |
+<!-- blast-radius-repos-end -->
+```
+
+   When the section exists:
+
+- Match rows by their `When relevant` trigger against the change being analyzed.
+- Use the exact `git-remote-url` from the matching rows for `embark search` (step 4) — do not look these values up again or infer them from names.
+
+   **Fall back to `embark repos` discovery only when the project has no such section, or it has no row relevant to the change** (and to sanity-check that the list is not missing an obvious candidate). The experimental repo discovery command:
 
 ```bash
 context repos "<repo or system terms>" --limit 30
@@ -38,26 +59,28 @@ You can omit query completely.
 context repos
 ```
 
+Note: `embark repos` matches **repository names by substring** and returns each repo's `repository` git-remote-url (e.g. `github.com/jetbrains/embark`) — this is the exact value `embark search --git-remote-url` expects. To populate the curated list, find a repo with `embark repos "<terms>" --json-output` and copy its `repository` value into a new row.
+
 2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
 
 - Query the prefix literally, for example `jcp` and `jcp-`.
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
-- Preserve the exact repository `id` returned by `context repos`; do not infer ids from names.
+- Preserve the exact `repository` git-remote-url returned by `context repos`; do not infer it from names.
 
 ```
 context repos "jcp-" # Example: show all repos started with jcp- prefix
 ```
 
-3. **Select suitable repos.** Prefer exact owner repos, exact consumer/producer repos, prefix-family matches, and repos whose description/path/language/domain matches the changed surface. If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
+3. **Select suitable repos.** Start from the rows whose `When relevant` triggers matched in the project's curated list, then add any exact owner/consumer/producer repos, prefix-family matches, and repos whose description/path/language/domain matches the changed surface (from the fallback `embark repos` discovery). If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
 
-4. **Search selected repos in parallel.** Invoke `context search` once per selected repository, passing the repository id from `context repo` with the id option supported by the installed experimental CLI:
+4. **Search selected repos in parallel.** Invoke `context search` once per selected repository, passing the repo's git-remote-url (the exact `git-remote-url` from the project's curated list, or the `repository` value from `context repos` for fallback candidates) via the `--git-remote-url` option:
 
 ```bash
-context search --repository-id "<repo-id>" --json-output --limit 10 "<semantic blast-radius search query>"
+context search --git-remote-url "<repo-git-remote-url>" --json-output --limit 10 "<semantic blast-radius search query>"
 ```
 
-If `context search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `context repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
+Run `context search --help` to confirm the flag for the installed experimental CLI if `--git-remote-url` is rejected, but still pass the exact git-remote-url from the project's curated list or `context repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
 5. **Resolve snippets and repo information with `gh`.** When `context search` returns promising snippets, use the GitHub CLI to fetch full source files, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `context repo` when available.
 
@@ -66,7 +89,7 @@ gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,
 gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/vnd.github.raw"
 ```
 
-6. **Synthesize blast-radius findings.** Report which repos were searched, which repos had useful matches, the strongest producers/consumers/files/symbols found, likely impacted surfaces, and unresolved unknowns. Separate confirmed impacts from plausible leads. If no suitable repo is found, say which repo filters were tried before stopping.
+6. **Synthesize blast-radius findings.** Report which repos were searched, which repos had useful matches, the strongest producers/consumers/files/symbols found, likely impacted surfaces, and unresolved unknowns. Separate confirmed impacts from plausible leads. If no suitable repo is found, say whether the project's curated list (`CLAUDE.md`/`AGENTS.md`) had a relevant row and which `embark repos` filters were tried before stopping. If a relevant repo seems to be missing from the curated list, note it (with its `repository-id` if known) so the project's list can be updated.
 
 ## Search Guidance
 
