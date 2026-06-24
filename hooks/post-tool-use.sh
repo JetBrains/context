@@ -9,7 +9,7 @@ if [[ -z "$SESSION_ID" || -z "$TOOL_NAME" ]]; then
   exit 0
 fi
 
-STATE_FILE="/tmp/claude-embark-hook-${SESSION_ID}.json"
+STATE_FILE="/tmp/claude-context-hook-${SESSION_ID}.json"
 umask 077
 
 init_state() {
@@ -37,7 +37,7 @@ fi
 case "$TOOL_NAME" in
   Bash)
     COMMAND="$(jq -r '.tool_input.command // empty' <<<"$INPUT")"
-    if [[ "$COMMAND" == *"embark search"* ]]; then
+    if [[ "$COMMAND" == *"context search"* ]]; then
       if [[ "$COMMAND" == *" -p "* ]]; then
         BOOTSTRAP_DONE="$(read_state bootstrap_done)"
         NARROWED_RETRY_USED="$(read_state narrowed_retry_used)"

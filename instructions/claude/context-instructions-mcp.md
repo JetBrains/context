@@ -1,15 +1,15 @@
 # Tools
 
-## Semantic Code Search (EmbArk)
+## Semantic Code Search (Context)
 
-You have access to the EmbArk MCP `code_search` tool for searching the codebase semantically.
+You have access to the Context MCP `code_search` tool for searching the codebase semantically.
 This tool can search for code snippets related in meaning to the search query and search objective.
 
-### MANDATORY: EmbArk First Bootstrap
+### Single-Shot Policy
 
-When no relevant file or subsystem is known yet, you MUST start code search with `code_search`.
+Use `code_search` as a semantic bootstrap when the relevant file or subsystem is still unknown.
 
-- Do one broad `code_search` first.
+- If no relevant file is open yet, start with one `code_search`.
 - Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
 - After the first search, open at least one returned file and inspect it locally.
 - If the first hit is relevant but incomplete, inspect neighboring files locally in that same directory or subsystem before any semantic retry.

@@ -1,5 +1,5 @@
 ---
-name: embark-review
+name: context-review
 description: "Use this skill to review code changes using semantic search to understand context and impact"
 ---
 
@@ -32,13 +32,13 @@ For each significantly changed file, use semantic search to understand:
 
 ```bash
 # Find similar patterns
-embark search "<code chunk that was changed>"
+context search "<code chunk that was changed>"
 
 # Find callers of a modified function
-embark search "calls to <function name> to understand impact"
+context search "calls to <function name> to understand impact"
 
 # Find related test files in the "test/" directory (path must be relative to the project root)
-embark search -p test "tests for <feature being modified>"
+context search -p test "tests for <feature being modified>"
 ```
 
 ### 3. Review Checklist
@@ -57,11 +57,11 @@ For each change, verify:
 git diff --staged
 
 # For a change to auth middleware, find similar patterns
-embark search "authentication middleware pattern"
+context search "authentication middleware pattern"
 
 # Find what calls this middleware
-embark search "uses auth middleware to protect routes"
+context search "uses auth middleware to protect routes"
 
 # Find related tests
-embark search -p test "auth middleware test"
+context search -p test "auth middleware test"
 ```

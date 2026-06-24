@@ -8,7 +8,7 @@ if [[ -z "$SESSION_ID" ]]; then
   exit 0
 fi
 
-STATE_FILE="/tmp/claude-embark-hook-${SESSION_ID}.json"
+STATE_FILE="/tmp/claude-context-hook-${SESSION_ID}.json"
 umask 077
 
 jq -n '{
@@ -17,7 +17,7 @@ jq -n '{
   narrowed_retry_used: false
 }' > "$STATE_FILE"
 
-CONTEXT="Workflow: if the relevant file or subsystem is still unclear, use semantic search before broad local discovery. After a semantic result, read at least one returned file before expanding locally with nearby files in that same directory or subsystem. If another semantic search is still needed, narrow it: on CLI use \`embark search -p <path> ...\`, and on MCP set \`pathFilter\`."
+CONTEXT="Workflow: if the relevant file or subsystem is still unclear, use semantic search before broad local discovery. After a semantic result, read at least one returned file before expanding locally with nearby files in that same directory or subsystem. If another semantic search is still needed, narrow it: on CLI use \`context search -p <path> ...\`, and on MCP set \`pathFilter\`."
 
 jq -n --arg ctx "$CONTEXT" '{
   hookSpecificOutput: {
