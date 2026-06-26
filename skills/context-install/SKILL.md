@@ -24,13 +24,13 @@ Use this skill to install the Context CLI and finish first-time setup (login, ag
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://packages.jetbrains.team/files/p/grazi/jetbrains-ai-public-releases/context/download-context.sh | bash
+curl -fsSL https://download.jetbrains.com/jetbrains-context/release/download-context.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://packages.jetbrains.team/files/p/grazi/jetbrains-ai-public-releases/context/download-context.ps1 | iex
+irm https://download.jetbrains.com/jetbrains-context/release/download-context.ps1 | iex
 ```
 
 ## Verify installation
@@ -64,13 +64,13 @@ If the user also wants Context configured for an agent, use `context setup-agent
 Claude non-interactive setup:
 
 ```bash
-context setup-agent --agent=CLAUDE --auto --non-interactive
+context setup-agent --agent=CLAUDE --auto
 ```
 
 Codex non-interactive setup:
 
 ```bash
-context setup-agent --agent=CODEX --auto --non-interactive
+context setup-agent --agent=CODEX --auto 
 ```
 
 Study help for any other agents and options:
