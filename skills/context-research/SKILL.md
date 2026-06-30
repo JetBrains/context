@@ -3,7 +3,7 @@ name: context-research
 context: fork
 agent: Explore
 argument-hint: query
-description: "Research and understand unfamiliar codebases using semantic search with `context search`"
+description: "Research and understand unfamiliar codebases using semantic search with `jbcontext search`"
 ---
 
 You need to gather all context for task $ARGUMENTS thoroughly.
@@ -17,13 +17,13 @@ You need to gather all context for task $ARGUMENTS thoroughly.
 
 ## Tools Available
 
-### `context search`
+### `jbcontext search`
 
 Semantic code search that finds code by meaning, not just exact keywords.
 
 ```bash
-context search "<descriptive query>" [path]
-context search -p <path> "<query>"  # <path> must be relative to the project root
+jbcontext search "<descriptive query>" [path]
+jbcontext search -p <path> "<query>"  # <path> must be relative to the project root
 ```
 
 **Query Tips:**
@@ -33,7 +33,7 @@ context search -p <path> "<query>"  # <path> must be relative to the project roo
 
 ## Research Workflow
 
-1. **Start broad**: Use `context search` with general terms to understand the landscape
+1. **Start broad**: Use `jbcontext search` with general terms to understand the landscape
 2. **Narrow down**: Add path filters (`-p`) once you identify relevant directories
 3. **Read the code**: Once you find relevant files, read them to understand the details
 
@@ -41,8 +41,8 @@ context search -p <path> "<query>"  # <path> must be relative to the project roo
 
 ```bash
 # Find authentication-related code
-context search "user authentication login"
+jbcontext search "user authentication login"
 
 # Narrow to specific directory
-context search -p src/auth "JWT token validation"
+jbcontext search -p src/auth "JWT token validation"
 ```

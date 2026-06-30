@@ -37,7 +37,7 @@ fi
 case "$TOOL_NAME" in
   Bash)
     COMMAND="$(jq -r '.tool_input.command // empty' <<<"$INPUT")"
-    if [[ "$COMMAND" == *"context search"* ]]; then
+    if [[ "$COMMAND" == *"jbcontext search"* ]]; then
       if [[ "$COMMAND" == *" -p "* ]]; then
         BOOTSTRAP_DONE="$(read_state bootstrap_done)"
         NARROWED_RETRY_USED="$(read_state narrowed_retry_used)"

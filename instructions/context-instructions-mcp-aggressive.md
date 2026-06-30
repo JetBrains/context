@@ -1,11 +1,11 @@
 # Tools
 
-## Semantic Code Search (Context)
+## Semantic Code Search (jbcontext)
 
-You have access to the Context MCP `code_search` tool for searching the codebase semantically.
+You have access to the jbcontext MCP `code_search` tool for searching the codebase semantically.
 This tool can search for code snippets related in meaning to the search query and search objective.
 
-### MANDATORY: Use Context first for code discovery
+### MANDATORY: Use jbcontext first for code discovery
 
 You MUST start code search with `code_search` before planning, editing, or exact search when you do not yet know the right file, subsystem, implementation, or related test. This is the default entry point for unfamiliar-code discovery.
 

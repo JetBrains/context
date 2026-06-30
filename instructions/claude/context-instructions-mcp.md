@@ -1,8 +1,8 @@
 # Tools
 
-## Semantic Code Search (Context)
+## Semantic Code Search (jbcontext)
 
-You have access to the Context MCP `code_search` tool for searching the codebase semantically.
+You have access to the jbcontext MCP `code_search` tool for searching the codebase semantically.
 This tool can search for code snippets related in meaning to the search query and search objective.
 
 ### Single-Shot Policy

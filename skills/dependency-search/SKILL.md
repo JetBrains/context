@@ -3,7 +3,7 @@ name: dependency-search
 context: fork
 agent: Explore
 argument-hint: dependency query
-description: "Experimental Context org-wide dependency search across multiple repositories. Use when need to find APIs in other repositories, or dependency configuration are used across repos for upgrades, removals, CVEs, migrations, or ownership discovery."
+description: "Experimental jbcontext org-wide dependency search across multiple repositories. Use when need to find APIs in other repositories, or dependency configuration are used across repos for upgrades, removals, CVEs, migrations, or ownership discovery."
 ---
 
 Use this skill to research `$ARGUMENTS` across all available repositories when the question is about dependency usage, dependency ownership, upgrade planning, migration scope, version drift, or remediation.
@@ -25,7 +25,7 @@ Use this skill to research `$ARGUMENTS` across all available repositories when t
 1. **Find candidate repositories first.** Run the experimental repo discovery command before searching code:
 
 ```bash
-context repos "<repo or dependency terms>" --limit 30
+jbcontext repos "<repo or dependency terms>" --limit 30
 ```
 
 Use short, discriminative terms from the request: package names, module names, framework names, SDK names, team names, service names, or explicit repository names.
@@ -35,25 +35,25 @@ Use short, discriminative terms from the request: package names, module names, f
 - Query the prefix literally, for example `jcp` and `jcp-`.
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
-- Preserve the exact repository `id` returned by `context repo`; do not infer ids from names.
+- Preserve the exact repository `id` returned by `jbcontext repos`; do not infer ids from names.
 
 ```
-context repos "jcp-" # show all repos started with jcp- prefix
+jbcontext repos "jcp-" # show all repos started with jcp- prefix
 ```
 
 You can omit query completely.
 
 3. **Select suitable repos.** Prefer exact dependency-owner repos, exact service matches, prefix-family matches, and repos whose description/path/language/package ecosystem matches the task. If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
 
-4. **Search selected repos in parallel.** Invoke `context search` once per selected repository, passing the repository id from `context repos` with the id option supported by the installed experimental CLI:
+4. **Search selected repos in parallel.** Invoke `jbcontext search` once per selected repository, passing the repository id from `jbcontext repos` with the id option supported by the installed experimental CLI:
 
 ```bash
-context search --repository-id "<repo-id>" --json-output --limit 10 "<semantic dependency search query>"
+jbcontext search --repository-id "<repo-id>" --json-output --limit 10 "<semantic dependency search query>"
 ```
 
-If `context search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `context repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
+If `jbcontext search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `jbcontext repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Resolve snippets and repo information with `gh`.** When `context search` returns promising snippets, use the GitHub CLI to fetch full manifests, lockfiles, source files, surrounding code, default branch, repo metadata, owners, recent commits, or related dependency PRs/issues before relying on the match. Use the GitHub owner/name or URL from `context repos` when available.
+5. **Resolve snippets and repo information with `gh`.** When `jbcontext search` returns promising snippets, use the GitHub CLI to fetch full manifests, lockfiles, source files, surrounding code, default branch, repo metadata, owners, recent commits, or related dependency PRs/issues before relying on the match. Use the GitHub owner/name or URL from `jbcontext repos` when available.
 
 ```bash
 gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,url
@@ -64,10 +64,10 @@ gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/
 
 ## Search Guidance
 
-- Use semantic, behavior-focused queries for `context search`; avoid one-word searches.
+- Use semantic, behavior-focused queries for `jbcontext search`; avoid one-word searches.
 - Include ecosystem-specific terms when useful, such as manifest names, package manager names, import namespaces, generated client names, runtime names, or version strings.
 - Search both declarations and runtime usage; dependency manifests alone can miss generated, vendored, plugin, or transitive usage.
-- Re-run `context repos` with narrower or prefix-aware terms before broadening code search.
+- Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
 - Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.
