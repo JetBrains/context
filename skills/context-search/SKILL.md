@@ -7,16 +7,16 @@ argument-hint: query
 
 # Semantic Code Search
 
-Use `context search` to find code snippets by meaning, not just keywords. If it's not installed use context-install skill.
+Use `jbcontext search` to find code snippets by meaning, not just keywords. If it's not installed use context-install skill.
 
-Use it as a single semantic bootstrap when the relevant file or subsystem is unknown. Do one broad search, open and inspect at least one returned file locally, and inspect nearby code in that same directory or subsystem before any retry. If that still does not identify the needed adjacent area, do a narrowed retry with `context search -p <path> ...` using the directory of the best first hit.
+Use it as a single semantic bootstrap when the relevant file or subsystem is unknown. Do one broad search, open and inspect at least one returned file locally, and inspect nearby code in that same directory or subsystem before any retry. If that still does not identify the needed adjacent area, do a narrowed retry with `jbcontext search -p <path> ...` using the directory of the best first hit.
 
 ## Usage
 
 ```bash
-context search "<detailed and descriptive query>"
-context search "<code snippet>" # find similar snippets
-context search -p <path> "<query>"  # <path> must be relative to the project root
+jbcontext search "<detailed and descriptive query>"
+jbcontext search "<code snippet>" # find similar snippets
+jbcontext search -p <path> "<query>"  # <path> must be relative to the project root
 ```
 
 ## Query Tips
@@ -30,8 +30,8 @@ context search -p <path> "<query>"  # <path> must be relative to the project roo
 
 ```bash
 # Find authentication-related code
-context search "user authentication login flow"
+jbcontext search "user authentication login flow"
 
 # Narrow to specific directory
-context search -p src/auth "JWT token validation"
+jbcontext search -p src/auth "JWT token validation"
 ```

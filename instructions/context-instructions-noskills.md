@@ -1,15 +1,15 @@
 # Tools
 
-## Semantic Code Search (Context)
+## Semantic Code Search (jbcontext)
 
-You have access to `context search` for searching the codebase semantically.
+You have access to `jbcontext search` for searching the codebase semantically.
 It finds code by meaning, not just keywords.
 
 ### Usage
 
 ```bash
-context search "<detailed and descriptive query>"
-context search -p <path> "<query>"  # <path> must be relative to the project root
+jbcontext search "<detailed and descriptive query>"
+jbcontext search -p <path> "<query>"  # <path> must be relative to the project root
 ```
 
 ### Query Tips
@@ -20,11 +20,11 @@ context search -p <path> "<query>"  # <path> must be relative to the project roo
 
 ### How to use it
 
-- Start with `context search` before planning, editing, or exact search in unfamiliar code when you do not yet know the right file, subsystem, implementation, or related test.
+- Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know the right file, subsystem, implementation, or related test.
 - Use one focused natural-language query per search.
 - Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
 - Inspect the first relevant file or directory before issuing another broad semantic search.
-- Use another broad `context search` only if the local path stops being productive.
+- Use another broad `jbcontext search` only if the local path stops being productive.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
 
@@ -32,16 +32,16 @@ context search -p <path> "<query>"  # <path> must be relative to the project roo
 
 ```bash
 # Find authentication-related code
-context search "user authentication login flow"
+jbcontext search "user authentication login flow"
 
 # Narrow to specific directory
-context search -p src/auth "JWT token validation"
+jbcontext search -p src/auth "JWT token validation"
 
 # Find callers of a function
-context search "calls to handleRequest to understand impact"
+jbcontext search "calls to handleRequest to understand impact"
 
 # Find related tests
-context search -p test "tests for authentication middleware"
+jbcontext search -p test "tests for authentication middleware"
 ```
 
-Use `context search` for discovery, inspect the first good hit, then move to exact/local inspection once the target area is known.
+Use `jbcontext search` for discovery, inspect the first good hit, then move to exact/local inspection once the target area is known.

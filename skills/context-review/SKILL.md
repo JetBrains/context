@@ -32,13 +32,13 @@ For each significantly changed file, use semantic search to understand:
 
 ```bash
 # Find similar patterns
-context search "<code chunk that was changed>"
+jbcontext search "<code chunk that was changed>"
 
 # Find callers of a modified function
-context search "calls to <function name> to understand impact"
+jbcontext search "calls to <function name> to understand impact"
 
 # Find related test files in the "test/" directory (path must be relative to the project root)
-context search -p test "tests for <feature being modified>"
+jbcontext search -p test "tests for <feature being modified>"
 ```
 
 ### 3. Review Checklist
@@ -57,11 +57,11 @@ For each change, verify:
 git diff --staged
 
 # For a change to auth middleware, find similar patterns
-context search "authentication middleware pattern"
+jbcontext search "authentication middleware pattern"
 
 # Find what calls this middleware
-context search "uses auth middleware to protect routes"
+jbcontext search "uses auth middleware to protect routes"
 
 # Find related tests
-context search -p test "auth middleware test"
+jbcontext search -p test "auth middleware test"
 ```
