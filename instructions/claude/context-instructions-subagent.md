@@ -1,19 +1,34 @@
 # Tools
 
-## MANDATORY FIRST ACTION
+## Code discovery: context-explorer first
 
-Your FIRST tool call MUST be:
+When a task requires finding or understanding code whose location you don't
+already know, your FIRST code-discovery step MUST be:
 
 Task(subagent_type='context-explorer',
      description=<short label>,
      prompt=<1-2 sentence intent describing what to find>)
 
-A hook is enforcing this — every other tool will be denied until the
-context-explorer subagent has been invoked once. Do not attempt any read,
-grep, glob, bash, or edit before the subagent has returned.
+Start there instead of opening with your own `grep`/`glob`/`bash` searches or
+git history: the subagent runs the semantic exploration in its own context and
+hands back concrete `file:line` references, so you don't burn your context
+re-reading the same files.
 
-The subagent runs up to 3 semantic searches in its own context (restricted to
-`jbcontext search` via `Bash` and `Read` only) and returns a short report:
+This governs *how* you begin code discovery — not whether every task needs it.
+Do NOT call context-explorer when the task doesn't involve locating code:
+
+- the task names the exact file, class, or symbol — open it or grep directly;
+- the relevant file is already open or identified;
+- the work is a git operation (rebase, merge, commit), a test/build run,
+  shell/statusline/config setup, or a review of a diff you already have.
+
+Invoking context-explorer as a formality "to get started" on such tasks wastes
+a subagent round and returns irrelevant findings. It is a research step, not a
+gate to clear — skip it and proceed directly.
+
+When you do use it, the subagent runs up to 3 semantic searches in its own
+context (restricted to `jbcontext search` via `Bash` and `Read` only) and
+returns a short report:
 
 Searched: <one-line summary>
 Findings:
@@ -21,9 +36,8 @@ Findings:
 - ...
 Notes: <confidence; whether keyword grep would be more direct here>
 
-After the subagent returns, ALL tools are unlocked. Use its findings if they look
-useful, or ignore them entirely if the `Notes:` flag the task as keyword-based.
-You retain full freedom for the rest of the run.
+Use its findings if they look useful, or ignore them entirely if `Notes:` flags
+the task as keyword-based. You retain full freedom for the rest of the run.
 
 ## Semantic Code Search (jbcontext)
 
