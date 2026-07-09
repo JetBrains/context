@@ -5,9 +5,18 @@
 You have access to the jbcontext MCP `code_search` tool for searching the codebase semantically.
 This tool can search for code snippets related in meaning to the search query and search objective.
 
+### When to use
+
+`code_search` is a **code-discovery** tool. It applies only when a task requires finding or understanding code whose location you don't already know.
+
+Skip it — go straight to the right tool — when:
+- the task names the exact file, class, or symbol (keyword grep is faster);
+- the relevant file is already open or identified;
+- the task doesn't involve locating code at all — git operations (rebase, merge, commit), running tests or builds, shell/statusline/config setup, or reviewing a diff you already have.
+
 ### MANDATORY: Use jbcontext first for code discovery
 
-You MUST start code search with `code_search` before planning, editing, or exact search when you do not yet know the right file, subsystem, implementation, or related test. This is the default entry point for unfamiliar-code discovery.
+When code discovery *is* needed and you do not yet know the right file, subsystem, implementation, or related test, you MUST start with `code_search` before planning, editing, or exact search. This mandate governs *how* you start code discovery, not whether every task needs a search.
 
 - Use one focused natural-language query per search.
 - Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.

@@ -5,9 +5,18 @@
 You have access to `jbcontext search` for searching the codebase semantically.
 It finds code by meaning, not just keywords.
 
+### When to use
+
+`jbcontext search` is a **code-discovery** tool. It applies only when a task requires finding or understanding code whose location you don't already know.
+
+Skip it — go straight to the right tool — when:
+- the task names the exact file, class, or symbol (keyword grep is faster);
+- the relevant file is already open or identified;
+- the task doesn't involve locating code at all — git operations (rebase, merge, commit), running tests or builds, shell/statusline/config setup, or reviewing a diff you already have.
+
 ### MANDATORY: jbcontext-first bootstrap
 
-When no relevant file or subsystem is known yet, you MUST start code search with `jbcontext search`.
+When code discovery *is* needed and no relevant file or subsystem is known yet, your first code-search action MUST be `jbcontext search` — do not open with `rg`/`grep`/`find` or git history. This mandate governs *how* you start searching, not whether every task needs a search.
 
 ### Usage
 
