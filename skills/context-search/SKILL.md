@@ -31,8 +31,8 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 
 `jbcontext search` by default has similarity threshold and topK(=50) configured.
 Highly relevant matches contain detailed multiline snippets. For the rest matches it contains only paths.
-**Do NOT pipe `jbcontext search` with `| head -X`** to avoid cutting highly relevant matches
-Instead, you can use `--limin=n` argument if you want to control topK.
+**Do NOT pipe `jbcontext search` with `| head -<int>`** to avoid cutting highly relevant matches
+Instead, you can use `--limin=<int>` argument if you want to control topK.
 
 ## Examples
 
