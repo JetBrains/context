@@ -22,3 +22,10 @@ Skip it — go straight to the right tool — when:
 - Use another broad `jbcontext search` only if the local path stops being productive.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
+
+## Controlling output size
+
+`jbcontext search` by default has similarity threshold and topK(=50) configured.
+Highly relevant matches contain detailed multiline snippets. For the rest matches it contains only paths.
+**Do NOT pipe `jbcontext search` with `| head -X`** to avoid cutting highly relevant matches
+Instead, you can use `--limin=n` argument if you want to control topK.

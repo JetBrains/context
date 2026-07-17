@@ -26,6 +26,14 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 - Specify what you're looking for: "React component that renders a modal dialog"
 - Make the first query specific to the issue's named feature, class, method, or behavior when available
 
+
+## Controlling output size
+
+`jbcontext search` by default has similarity threshold and topK(=50) configured.
+Highly relevant matches contain detailed multiline snippets. For the rest matches it contains only paths.
+**Do NOT pipe `jbcontext search` with `| head -X`** to avoid cutting highly relevant matches
+Instead, you can use `--limin=n` argument if you want to control topK.
+
 ## Examples
 
 ```bash
