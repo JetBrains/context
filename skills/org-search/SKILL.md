@@ -29,14 +29,14 @@ Use this skill to research `$ARGUMENTS` across all available repositories, espec
 jbcontext repos "<repo or domain terms>" --limit 30
 ```
 
-Use short, discriminative repo terms from the request: product names, service names, team names, package names, or explicit repository names.
+Use short, discriminative repo terms from the request: product names, service names, team names, package names, or explicit repository names. The query matches repository names and what a repository does, so when the name is unknown describe its purpose or stack in a few words instead.
 
 2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
 
 - Query the prefix literally, for example `jcp` and `jcp-`.
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
-- Preserve the exact repository `id` returned by `jbcontext repos`; do not infer ids from names.
+- Preserve the exact `repository` value returned by `jbcontext repos`; do not infer it from names.
 
 ```
 jbcontext repos "jcp-" # show all repos started with jcp- prefix
@@ -46,13 +46,13 @@ You can omit query completely.
 
 3. **Select suitable repos.** Prefer exact name matches, prefix-family matches, and repos whose description/path/language matches the task. If there are many candidates, search the most likely 5-10 first, then expand if results are weak.
 
-4. **Search selected repos in parallel.** Invoke `jbcontext search` once per selected repository, passing the repository id from `jbcontext repos` with the id option supported by the installed experimental CLI:
+4. **Search selected repos in parallel.** Invoke `jbcontext search` once per selected repository, passing the exact `repository` value from `jbcontext repos` via `--git-remote-url`:
 
 ```bash
-jbcontext search --repository-id "<repo-id>" --json-output --limit 10 "<semantic search query>"
+jbcontext search --git-remote-url "<repository>" --json-output --limit 10 "<semantic search query>"
 ```
 
-If `jbcontext search --help` shows a different repository-id flag, use that flag, but still pass the exact id from `jbcontext repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
+Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
 5. **Resolve snippets and repo information with `gh`.** When `jbcontext search` returns promising snippets, use the GitHub CLI to fetch full file context, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `jbcontext repos` when available.
 
@@ -66,7 +66,7 @@ gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/
 ## Search Guidance
 
 - Use semantic, behavior-focused queries for `jbcontext search`; avoid one-word searches.
-- Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search.
+- Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search; if a description query returns nothing, fall back to name terms.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
 - Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.

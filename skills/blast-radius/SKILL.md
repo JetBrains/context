@@ -51,7 +51,7 @@ Use this skill to research `$ARGUMENTS` across all available repositories when t
 jbcontext repos "<repo or system terms>" --limit 30
 ```
 
-Use short, discriminative terms from the request: service names, endpoint names, schema names, event/topic names, package names, team names, product names, or explicit repository names. The shorter the better.
+Use short, discriminative terms from the request: service names, endpoint names, schema names, event/topic names, package names, team names, product names, or explicit repository names. The shorter the better. The query matches repository names and what a repository does, so when the name is unknown describe its purpose or stack in a few words instead.
 
 You can omit query completely.
 
@@ -59,7 +59,7 @@ You can omit query completely.
 jbcontext repos
 ```
 
-Note: `jbcontext repos` matches **repository names by substring** and returns each repo's `repository` git-remote-url (e.g. `github.com/jetbrains/context`) — this is the exact value `jbcontext search --git-remote-url` expects. To populate the curated list, find a repo with `jbcontext repos "<terms>" --json-output` and copy its `repository` value into a new row.
+Note: `jbcontext repos` returns each repo's `repository` git-remote-url (e.g. `github.com/jetbrains/context`) — this is the exact value `jbcontext search --git-remote-url` expects. To populate the curated list, find a repo with `jbcontext repos "<terms>" --json-output` and copy its `repository` value into a new row.
 
 2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
 
@@ -89,14 +89,14 @@ gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,
 gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/vnd.github.raw"
 ```
 
-6. **Synthesize blast-radius findings.** Report which repos were searched, which repos had useful matches, the strongest producers/consumers/files/symbols found, likely impacted surfaces, and unresolved unknowns. Separate confirmed impacts from plausible leads. If no suitable repo is found, say whether the project's curated list (`CLAUDE.md`/`AGENTS.md`) had a relevant row and which `jbcontext repos` filters were tried before stopping. If a relevant repo seems to be missing from the curated list, note it (with its `repository-id` if known) so the project's list can be updated.
+6. **Synthesize blast-radius findings.** Report which repos were searched, which repos had useful matches, the strongest producers/consumers/files/symbols found, likely impacted surfaces, and unresolved unknowns. Separate confirmed impacts from plausible leads. If no suitable repo is found, say whether the project's curated list (`CLAUDE.md`/`AGENTS.md`) had a relevant row and which `jbcontext repos` filters were tried before stopping. If a relevant repo seems to be missing from the curated list, note it (with its `repository` git-remote-url if known) so the project's list can be updated.
 
 ## Search Guidance
 
 - Use semantic, behavior-focused queries for `jbcontext search`; avoid one-word searches.
 - Search for both names and behavior: endpoint paths, message names, schema fields, event topics, config keys, feature flags, error strings, metric names, and the behavior being changed.
 - Search producers, consumers, tests, generated code, docs, and deployment/config paths when blast radius matters.
-- Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search.
+- Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search; if a description query returns nothing, fall back to name terms.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
 - Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.
