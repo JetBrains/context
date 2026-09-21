@@ -1,0 +1,26 @@
+{
+  "$comment": [
+    "Cell codex+gpt-6-astra+medium of SWE-Bench-LG (All), exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.12.803 on the stable channel, codex 0.153.4, flags --auto.",
+    "The arm run WITH jbcontext: TeamCity build #40.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "jbcontext",
+  "dataset": "swebench-lg-all",
+  "harness": "codex",
+  "model": "gpt-6-astra",
+  "effort": "medium",
+  "integration": "--auto",
+  "taskCount": 1538,
+  "resolvedRate": 0.6023,
+  "run": {
+    "pipeline": "https://jcp.internal.teamcity.cloud/buildConfiguration/Deployments_Meta_Emb_Idx_Eval_SwebenchLg/1456571",
+    "startedAt": "20260915T212116+0000"
+  },
+  "metrics": {
+    "costUsd": 0.8976,
+    "latencyMs": 339693.0
+  }
+}

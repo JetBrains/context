@@ -1,0 +1,11 @@
+{
+  "$comment": [
+    "Properties of the TASK SET, so this file is written once per dataset and shared by both arms of every cell under it.",
+    "sizeLabel is declared by the exporting dashboard: the eval publishes no repository file count or LOC for the CLI to bucket from.",
+    "taskCount is the smallest count any arm below covers; each arm also carries its own, which is what the projection prefers.",
+    "Generated from BenchRoom (Matterhorn_BenchmarksV1_AggregateExecutionsJbResearchPrivateSweBenchAllValidIdsWithSeedsEmbark) on 2026-09-21T15:03:51Z."
+  ],
+  "name": "jb-research-private-all-valid-ids",
+  "sizeLabel": "L",
+  "taskCount": 299
+}

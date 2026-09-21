@@ -1,0 +1,30 @@
+{
+  "$comment": [
+    "Cell codex+gpt-6-astra+medium of BenchRoom, exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.12.803 on the release channel, codex 0.153.4, flags --auto.",
+    "The arm run WITH jbcontext: TeamCity build #45.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
+    "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
+    "toolCalls: mean tool calls per task, from the junie_number_tool_calls_avg build statistic",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "jbcontext",
+  "dataset": "jb-research-private-all-valid-ids",
+  "harness": "codex",
+  "model": "gpt-6-astra",
+  "effort": "medium",
+  "integration": "--auto",
+  "taskCount": 300,
+  "resolvedRate": 0.4667,
+  "run": {
+    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsJbResearchPrivateSweBenchAllValidIdsWithSeedsEmbark/7062977",
+    "startedAt": "20260910T014943+0000"
+  },
+  "metrics": {
+    "costUsd": 0.0324,
+    "turns": 0.99,
+    "toolCalls": 47.98,
+    "latencyMs": 219273.0
+  }
+}

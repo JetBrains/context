@@ -1,0 +1,26 @@
+{
+  "$comment": [
+    "Cell claude-code+claude-opus-5+medium of SWE-Bench-LG (All), exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.13.860 on the release channel, claude-code 2.1.263, flags --auto.",
+    "The arm run WITH jbcontext: TeamCity build #58.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "jbcontext",
+  "dataset": "swebench-lg-all",
+  "harness": "claude-code",
+  "model": "claude-opus-5",
+  "effort": "medium",
+  "integration": "--auto",
+  "taskCount": 1535,
+  "resolvedRate": 0.678,
+  "run": {
+    "pipeline": "https://jcp.internal.teamcity.cloud/buildConfiguration/Deployments_Meta_Emb_Idx_Eval_SwebenchLg/1471756",
+    "startedAt": "20260918T101634+0000"
+  },
+  "metrics": {
+    "costUsd": 1.6277,
+    "latencyMs": 470811.0
+  }
+}
