@@ -43,7 +43,7 @@ Use this skill to research `$ARGUMENTS` across all available repositories when t
    When the section exists:
 
 - Match rows by their `When relevant` trigger against the change being analyzed.
-- Use the exact `git-remote-url` from the matching rows for `jbcontext search` (step 4) — do not look these values up again or infer them from names.
+- Use the exact `git-remote-url` from the matching rows for `jbcontext search` (step 4) - do not look these values up again or infer them from names.
 
    **Fall back to `jbcontext repos` discovery only when the project has no such section, or it has no row relevant to the change** (and to sanity-check that the list is not missing an obvious candidate). The experimental repo discovery command:
 
@@ -59,7 +59,7 @@ You can omit query completely.
 jbcontext repos
 ```
 
-Note: `jbcontext repos` returns each repo's `repository` git-remote-url (e.g. `github.com/jetbrains/context`) — this is the exact value `jbcontext search --git-remote-url` expects. To populate the curated list, find a repo with `jbcontext repos "<terms>" --json-output` and copy its `repository` value into a new row.
+Note: `jbcontext repos` returns each repo's `repository` git-remote-url (e.g. `github.com/jetbrains/context`) - this is the exact value `jbcontext search --git-remote-url` expects. To populate the curated list, find a repo with `jbcontext repos "<terms>" --json-output` and copy its `repository` value into a new row.
 
 2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
 
