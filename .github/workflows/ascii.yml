@@ -1,0 +1,16 @@
+name: ascii
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  ascii:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject non-ASCII in agent-facing files
+        run: |
+          if git grep -nP '[^\t\r\x20-\x7E]' -- instructions agents skills; then
+            echo "::error::Non-ASCII or control characters found; use -, ->, ... and straight quotes"
+            exit 1
+          fi
