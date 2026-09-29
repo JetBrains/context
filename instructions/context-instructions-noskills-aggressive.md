@@ -10,6 +10,7 @@ It finds code by meaning, not just keywords.
 `jbcontext search` is a **code-discovery** tool. It applies only when a task requires finding or understanding code whose location you don't already know.
 
 Skip it — go straight to the right tool — when:
+
 - the task names the exact file, class, or symbol (keyword grep is faster);
 - the relevant file is already open or identified;
 - the task doesn't involve locating code at all — git operations (rebase, merge, commit), running tests or builds, shell/statusline/config setup, or reviewing a diff you already have.
@@ -30,7 +31,6 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 - Be descriptive: "Where is a function that validates user email addresses" > "email"
 - Include context: "Find error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
-
 - Use one focused natural-language query per search.
 - Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.
 - Inspect the first relevant file or directory before issuing another broad semantic search.

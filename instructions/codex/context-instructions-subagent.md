@@ -19,6 +19,7 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 - Specify what you're looking for: "React component that renders a modal dialog"
 
 ### How to use it
+
 - Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know the right file, subsystem, implementation, or related test.
 - Use one focused natural-language query per search.
 - Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.

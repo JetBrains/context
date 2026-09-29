@@ -16,6 +16,7 @@ Use the `/context-search` skill or run `jbcontext search "<query>"` to find code
 `jbcontext search` is a **code-discovery** tool. It applies only when a task requires finding or understanding code whose location you don't already know.
 
 Skip it — go straight to the right tool — when:
+
 - the task names the exact file, class, or symbol (keyword grep is faster);
 - the relevant file is already open or identified;
 - the task doesn't involve locating code at all — git operations (rebase, merge, commit), running tests or builds, shell/statusline/config setup, or reviewing a diff you already have.
