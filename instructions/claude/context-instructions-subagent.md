@@ -14,17 +14,17 @@ git history: the subagent runs the semantic exploration in its own context and
 hands back concrete `file:line` references, so you don't burn your context
 re-reading the same files.
 
-This governs *how* you begin code discovery — not whether every task needs it.
+This governs *how* you begin code discovery - not whether every task needs it.
 Do NOT call context-explorer when the task doesn't involve locating code:
 
-- the task names the exact file, class, or symbol — open it or grep directly;
+- the task names the exact file, class, or symbol - open it or grep directly;
 - the relevant file is already open or identified;
 - the work is a git operation (rebase, merge, commit), a test/build run,
   shell/statusline/config setup, or a review of a diff you already have.
 
 Invoking context-explorer as a formality "to get started" on such tasks wastes
 a subagent round and returns irrelevant findings. It is a research step, not a
-gate to clear — skip it and proceed directly.
+gate to clear - skip it and proceed directly.
 
 When you do use it, the subagent runs up to 3 semantic searches in its own
 context (restricted to `jbcontext search` via `Bash` and `Read` only) and
@@ -32,7 +32,7 @@ returns a short report:
 
 Searched: <one-line summary>
 Findings:
-- <relative/path>:<line> — <description>
+- <relative/path>:<line> - <description>
 - ...
 Notes: <confidence; whether keyword grep would be more direct here>
 

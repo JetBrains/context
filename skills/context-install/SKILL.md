@@ -1,6 +1,6 @@
 ---
 name: context-install
-description: Install jbcontext and complete first-time setup — login and configure agent integration. Use when `jbcontext` is not found or the user asks to install jbcontext.
+description: Install jbcontext and complete first-time setup - login and configure agent integration. Use when `jbcontext` is not found or the user asks to install jbcontext.
 ---
 
 # Install and set up jbcontext
@@ -15,9 +15,9 @@ Use this skill to install the jbcontext CLI and finish first-time setup (login, 
 
 ## Do not use for
 
-- Authentication issues → use `jbcontext login`
-- Missing project index → use `jbcontext index`
-- Agent integration only → use `jbcontext setup-agent --help`
+- Authentication issues -> use `jbcontext login`
+- Missing project index -> use `jbcontext index`
+- Agent integration only -> use `jbcontext setup-agent --help`
 
 ## Install
 
