@@ -23,10 +23,13 @@
 [CmdletBinding()]
 param(
     [string]$Prompt,
-    [string]$Model = "claude-opus-4-8"
+    [string]$Model   # empty => Claude Code's default model
 )
 
 $ErrorActionPreference = "Stop"
+
+# Only pass --model when one was given, so the default follows the user's Claude Code config.
+$modelArgs = @(if ($Model) { '--model', $Model })
 
 # --- Environment we will toggle. Capture originals so we can restore them. -----------------
 $cacheVars = @{
@@ -183,14 +186,14 @@ function Invoke-ClaudeRun([string]$label, [string]$query) {
     # --- Turn 1: warm-up (writes the TUI prefix into cache) --------------------------------
     Write-Host "WARM-UP: in Claude, type  hi  and press Enter; wait for the reply, then /exit." -ForegroundColor Yellow
     Wait-Key "  Press any key to start the WARM-UP session..."
-    Start-Process -FilePath $ClaudeExe -ArgumentList '--model', $Model, '--append-system-prompt', $nonce -WorkingDirectory $WorkingDir -NoNewWindow -Wait
+    Start-Process -FilePath $ClaudeExe -ArgumentList ($modelArgs + '--append-system-prompt', $nonce) -WorkingDirectory $WorkingDir -NoNewWindow -Wait
 
     # --- Turn 2: measured (reads the prefix warm; keep it to ONE turn) ---------------------
     Set-Clipboard -Value $query
     Write-Host "MEASURED: the query is on your clipboard. Paste it (Ctrl+V), press Enter, wait, then /exit." -ForegroundColor Yellow
     Write-Host "          Do exactly ONE turn so the cost is just the query." -ForegroundColor DarkGray
     Wait-Key "  Press any key to start the MEASURED session..."
-    Start-Process -FilePath $ClaudeExe -ArgumentList '--model', $Model, '--append-system-prompt', $nonce -WorkingDirectory $WorkingDir -NoNewWindow -Wait
+    Start-Process -FilePath $ClaudeExe -ArgumentList ($modelArgs + '--append-system-prompt', $nonce) -WorkingDirectory $WorkingDir -NoNewWindow -Wait
 
     # Read official metrics; retry in case the config write lags process exit.
     $r = $null
