@@ -32,6 +32,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# Only pass --model when one was given, so the default follows the user's Claude Code config.
+MODEL_ARGS=()
+[ -n "$MODEL" ] && MODEL_ARGS=(--model "$MODEL")
+
 CACHE_VARS="DISABLE_PROMPT_CACHING DISABLE_AUTOUPDATER ENABLE_PROMPT_CACHING_1H"
 
 # Indexed arrays are fine on bash 3.2 (macOS); associative arrays are not, so we avoid them.
@@ -173,7 +177,7 @@ invoke_run() {
     # --- Turn 1: warm-up (writes the TUI prefix into cache) --------------------------------
     echo "WARM-UP: in Claude, type  hi  and press Enter; wait for the reply, then /exit."
     pause "  Press any key to start the WARM-UP session..."
-    "$CLAUDE_BIN" --model "$MODEL" --append-system-prompt "$nonce" || true
+    "$CLAUDE_BIN" ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} --append-system-prompt "$nonce" || true
 
     # --- Turn 2: measured (reads the prefix warm; keep it to ONE turn) ---------------------
     if copy_clip "$PROMPT"; then
@@ -185,7 +189,7 @@ invoke_run() {
         echo "Do exactly ONE turn, then /exit."
     fi
     pause "  Press any key to start the MEASURED session..."
-    "$CLAUDE_BIN" --model "$MODEL" --append-system-prompt "$nonce" || true
+    "$CLAUDE_BIN" ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} --append-system-prompt "$nonce" || true
 
     # Read official metrics; retry in case the config write lags process exit.
     local out="" i

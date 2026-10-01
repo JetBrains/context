@@ -67,7 +67,9 @@ retrieval measurably changes the answer's cost and quality.
 ./single-query-bench-claude.ps1 [-Model <id>] [-Prompt "your query"]
 ```
 
-- Default model is `claude-opus-4-8`. If the query is omitted, you're prompted for it.
+- By default no `--model` is passed, so Claude Code uses its own default model (your `/model`
+  setting). Pass `--model` / `-Model` to benchmark a specific one. If the query is omitted,
+  you're prompted for it.
 - Follow the on-screen steps. Before each Claude launch the script pauses for a keypress so
   you can read the instructions; the TUI then takes over the terminal.
 - **In the measured session, do exactly ONE turn** (paste query → wait → `/exit`), or the
