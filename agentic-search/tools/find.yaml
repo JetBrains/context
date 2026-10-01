@@ -1,0 +1,13 @@
+description: >-
+  List project files by path with system `find` over the project's working tree (uncommitted files
+  included). Pass find's own arguments in `args` — the full find CLI is available, except verbs that
+  write or execute (`-delete`, `-exec`, …), which are refused. Runs in the project root; paths MUST
+  come before any expression (`find . -name '*.kt'`, never `find -name '*.kt'`). Does NOT honor
+  .gitignore, so exclude noise yourself (e.g. `-not -path '*/build/*'`). Use to discover files by
+  name/extension before reading them.
+params:
+  args: >-
+    Arguments passed to `find` (everything after the program name), one token per array element —
+    paths first, then the expression: ["." , "-name", "*.kt", "-not", "-path", "*/build/*"]. Runs in
+    the project root. Output is capped at a few hundred lines, so narrow with `-name`/`-path`/`-maxdepth`
+    instead of listing the whole tree.

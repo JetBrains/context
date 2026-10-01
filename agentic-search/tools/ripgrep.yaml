@@ -1,0 +1,11 @@
+description: >-
+  Search file contents with ripgrep (`rg`) over the project's working tree (uncommitted edits
+  included). Pass ripgrep's own arguments in `args` (e.g. flags, pattern, paths) — the full
+  rg CLI is available. Rust-regex syntax; honors .gitignore. Runs in the project root. You
+  MUST include a path to search (use `.` for the whole tree); without one nothing is searched.
+params:
+  args: >-
+    Arguments passed to `rg` (everything after the program name), one token per array
+    element — e.g. ["-n", "--max-count=3", "-e", "TODO", "src"]. Runs in the project root. You
+    MUST include a path to search (use `.` for the whole tree) — with no path the tool reads
+    empty stdin and finds nothing. Output is plain (color disabled) and capped.

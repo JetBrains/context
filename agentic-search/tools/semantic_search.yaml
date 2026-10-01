@@ -1,0 +1,8 @@
+description: >-
+  Embedding-based code search over the indexed repository — the strongest tool for finding code
+  by meaning/intent (not just literal text). Lead with this. Returns ranked snippets with
+  file paths and line ranges. Optionally narrow with `pathFilter`. Note: reflects the indexed
+  revision, which may lag uncommitted local edits (use grep/read for the live working tree).
+params:
+  query: Natural-language or code query describing what to find.
+  pathFilter: Optional project-relative path prefix to narrow the search (e.g. `src/auth`).

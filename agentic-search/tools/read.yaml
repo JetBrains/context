@@ -1,0 +1,7 @@
+description: >-
+  Read a file's contents (uncommitted edits included), with line numbers. Optionally restrict to
+  a [startLine, endLine] range (1-based, inclusive). Use to inspect candidates before submitting.
+params:
+  path: Project-relative path to the file to read.
+  startLine: 1-based first line to read. Defaults to 1.
+  endLine: 1-based last line to read (inclusive). Defaults to the file end (capped).
