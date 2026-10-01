@@ -1,0 +1,8 @@
+# Tools offered to the agentic search loop. `submit_results` is always enabled.
+# `grep` and `ripgrep` both mean "the text-search tool"; the CLI picks ripgrep when `rg` is on PATH.
+enabled:
+  - ripgrep
+  - grep
+  - find
+  - read
+  - semantic_search

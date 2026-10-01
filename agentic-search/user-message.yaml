@@ -1,0 +1,7 @@
+query: |-
+  Find the code most relevant to this query:
+
+  {{query}}
+pathFilter:
+  strict: "You MUST restrict all results to paths under `{{pathFilter}}`."
+  hint: "Hint: relevant code is likely under `{{pathFilter}}`, but you may search elsewhere if needed."

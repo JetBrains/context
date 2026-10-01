@@ -1,0 +1,13 @@
+description: >-
+  Submit the final ranked search results and finish. Call this exactly once, when you have found
+  the most relevant code. Provide each result's file path, line range, and a relevance grade:
+    3 = dedicated/exact answer to the query
+    2 = answers indirectly or incompletely
+    1 = related but does not answer
+    0 = unrelated (will be dropped)
+  Submit an empty list only if nothing relevant exists. Order does not matter; results are ranked
+  by grade.
+params:
+  results: The ranked result locations. May be empty if no relevant code exists.
+  results.path: Project-relative file path.
+  results.relevance: Relevance grade 0–3 (see tool description).
