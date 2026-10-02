@@ -65,15 +65,14 @@ case "$TOOL_NAME" in
         exit 0
       fi
 
-      if [[ "$BOOTSTRAP_DONE" == "true" ]]; then
-        deny "Do not issue a second broad `jbcontext search`. Read a returned file first, inspect nearby code locally, and if a retry is still needed use \`jbcontext search -p <path> ...\`."
-      fi
+      # Separate broad searches for clearly different aspects are allowed (they may run in
+      # parallel); retries of the same aspect should be narrowed with -p.
       exit 0
     fi
 
     if [[ "$COMMAND" =~ (^|[[:space:]])(rg|grep|find)([[:space:]]|$) ]]; then
       if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
-        deny "Do not start broad local discovery before semantic bootstrap. Use one broad `jbcontext search` first when the relevant area is still unknown."
+        deny "Do not start broad local discovery before semantic bootstrap. Start with `jbcontext search` when the relevant area is still unknown."
       fi
 
       if [[ "$READ_AFTER_BOOTSTRAP" != "true" ]]; then
@@ -89,7 +88,7 @@ case "$TOOL_NAME" in
     ;;
   Grep)
     if [[ "$BOOTSTRAP_DONE" != "true" ]]; then
-      deny "Do not start broad local discovery before semantic bootstrap. Use one broad `jbcontext search` first when the relevant area is still unknown."
+      deny "Do not start broad local discovery before semantic bootstrap. Start with `jbcontext search` when the relevant area is still unknown."
     fi
 
     if [[ "$READ_AFTER_BOOTSTRAP" != "true" ]]; then
