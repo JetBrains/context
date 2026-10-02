@@ -1,0 +1,32 @@
+{
+  "name": "jbcontext",
+  "owner": {
+    "name": "JetBrains",
+    "email": "junie@jetbrains.com"
+  },
+  "metadata": {
+    "description": "Open integrations for JetBrains Context, including skills, agents, instructions, hooks, and MCP configuration.",
+    "version": "1.0.0",
+    "homepage": "https://github.com/JetBrains/context"
+  },
+  "extensions": [
+    {
+      "name": "jbcontext",
+      "source": ".",
+      "description": "Skills, agents, instructions, hooks, and MCP configuration for JetBrains jbcontext.",
+      "version": "1.0.0",
+      "author": {
+        "name": "JetBrains"
+      },
+      "category": "developer-tools",
+      "homepage": "https://github.com/JetBrains/context",
+      "keywords": [
+        "jbcontext",
+        "code-search",
+        "skills",
+        "agents",
+        "mcp"
+      ]
+    }
+  ]
+}
