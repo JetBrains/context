@@ -1,32 +1,43 @@
 # Tools
 
-## Code discovery: context-explorer first
+## Code discovery: jbcontext search first
 
 When a task requires finding or understanding code whose location you don't
-already know, your FIRST code-discovery step MUST be:
+already know, your FIRST code-discovery step MUST be a `jbcontext search` for
+that question (see below), run before your own `grep`/`glob`/`bash` searches or
+git history.
+
+Read the results and judge whether they answer the question. Often a single
+search is enough - then switch to direct file reads. Only if the search result
+is insufficient, delegate the remaining exploration to the context-explorer
+subagent:
 
 Task(subagent_type='context-explorer',
      description=<short label>,
-     prompt=<1-2 sentence intent describing what to find>)
+     prompt=<1-2 sentence intent describing what to find, plus the key
+             `file:line` hits the search already returned and what is still
+             unknown>)
 
-Start there instead of opening with your own `grep`/`glob`/`bash` searches or
-git history: the subagent runs the semantic exploration in its own context and
-hands back concrete `file:line` references, so you don't burn your context
-re-reading the same files.
+Never start context-explorer for a question you have not yet run
+`jbcontext search` for. Handing it the results you already have lets it do
+focused work on the gap instead of repeating your search, and it returns
+concrete `file:line` references so you don't burn your context re-reading the
+same files.
 
 This governs *how* you begin code discovery - not whether every task needs it.
-Do NOT call context-explorer when the task doesn't involve locating code:
+Do NOT run a discovery search or call context-explorer when the task doesn't
+involve locating code:
 
 - the task names the exact file, class, or symbol - open it or grep directly;
 - the relevant file is already open or identified;
 - the work is a git operation (rebase, merge, commit), a test/build run,
   shell/statusline/config setup, or a review of a diff you already have.
 
-Invoking context-explorer as a formality "to get started" on such tasks wastes
-a subagent round and returns irrelevant findings. It is a research step, not a
-gate to clear - skip it and proceed directly.
+Searching or invoking context-explorer as a formality "to get started" on such
+tasks wastes a round and returns irrelevant findings. It is a research step,
+not a gate to clear - skip it and proceed directly.
 
-When you do use it, the subagent runs up to 3 semantic searches in its own
+When you do start context-explorer, it runs up to 3 semantic searches in its own
 context (restricted to `jbcontext search` via `Bash` and `Read` only) and
 returns a short report:
 
@@ -78,4 +89,4 @@ jbcontext search "user authentication login flow"
 jbcontext search -p src/auth "JWT token validation"
 ```
 
-Use `jbcontext search` once to get the initial pointer, then inspect nearby code locally. If that still fails, do a narrowed retry with `-p`.
+Use `jbcontext search` once to get the initial pointer, then inspect nearby code locally. If that still fails, do a narrowed retry with `-p`, or hand the results and the remaining gap to context-explorer as described above.
