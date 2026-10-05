@@ -11,15 +11,15 @@ Use `jbcontext search-deps` to find code in the sources of a library the project
 ## Usage
 
 ```bash
-jbcontext search-deps "<detailed and descriptive query>" <dependency> <version>
+jbcontext search-deps "<detailed and descriptive query>" <dependency>
 jbcontext search-deps "<query>" <dependency> <version> --limit 5
 ```
 
-`<dependency>` is the library coordinate as declared in the build, e.g. Maven `group:artifact`. `<version>` is optional: without it the latest indexed version is searched, which may not be the one the project uses.
+`<dependency>` is the library coordinate as declared in the build, e.g. Maven `group:artifact`. `<version>` is optional: without it the CLI reads the version from the project's Gradle or Maven files (lockfiles, version catalogs, build scripts, `pom.xml`) and names the file it used in the first line of the result. `latest` searches the latest indexed version.
 
-## Find the dependency and version first
+## When the version is not detected
 
-Pass the version whenever the project pins one, and do not guess it: read it from the project before searching.
+If the CLI says it could not find the version, or picked one of several versions the project declares and you need another, find the version yourself and pass it explicitly. Do not guess it: read it from the project, or ask the user.
 
 - Gradle: `build.gradle(.kts)` dependency declarations, version catalogs in `gradle/libs.versions.toml`, or `./gradlew dependencies` / `dependencyInsight --dependency <name>` for the resolved version.
 - Maven: `pom.xml` `<dependency>` and `<dependencyManagement>`, property placeholders such as `${ktor.version}`, or `mvn dependency:tree`.
@@ -35,7 +35,8 @@ The first line names what was actually searched, for example:
 Searched io.ktor:ktor-client-core 3.1.1 in ktorio/ktor@0495b8b1c2d3, nearest to 3.0.3
 ```
 
-- `(latest indexed)` means no version was given; pass the project's version if the answer depends on it.
+- `; version <v> from <file>` names the project file the version was detected in.
+- `(latest indexed)` means `latest` was requested; pass the project's version if the answer depends on it.
 - `nearest to <requested>` means the requested version is not indexed and the closest indexed one was searched instead. Behavior can differ between versions: say so when the answer depends on details that may have changed.
 - Each result has a `Source:` link to the file on GitHub at that commit. Use it (or `gh api`) to read the full file around the snippet before relying on it.
 
