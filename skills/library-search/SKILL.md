@@ -1,7 +1,7 @@
 ---
 name: library-search
 description: "Semantic search in the sources of an open-source library at the version the project depends on.\n- Use this skill when the answer depends on how a third-party dependency actually behaves: its defaults, configuration options, exceptions it throws, extension points, or an API whose signature you are unsure of for this version.\n- When not to use: for code inside the current project (use context-search), for libraries the project does not depend on, or when the library's source is already checked out locally."
-argument-hint: dependency version query
+argument-hint: query dependency [version]
 ---
 
 # Library Source Search
@@ -11,15 +11,15 @@ Use `jbcontext search-deps` to find code in the sources of a library the project
 ## Usage
 
 ```bash
-jbcontext search-deps <dependency> <version> "<detailed and descriptive query>"
-jbcontext search-deps <dependency> <version> "<query>" --limit 5
+jbcontext search-deps "<detailed and descriptive query>" <dependency> <version>
+jbcontext search-deps "<query>" <dependency> <version> --limit 5
 ```
 
-`<dependency>` is the library coordinate as declared in the build, e.g. Maven `group:artifact`.
+`<dependency>` is the library coordinate as declared in the build, e.g. Maven `group:artifact`. `<version>` is optional: without it the index picks the version to search, which may not be the one the project uses.
 
 ## Find the dependency and version first
 
-Do not guess the version: read it from the project before searching.
+Pass the version whenever the project pins one, and do not guess it: read it from the project before searching.
 
 - Gradle: `build.gradle(.kts)` dependency declarations, version catalogs in `gradle/libs.versions.toml`, or `./gradlew dependencies` / `dependencyInsight --dependency <name>` for the resolved version.
 - Maven: `pom.xml` `<dependency>` and `<dependencyManagement>`, property placeholders such as `${ktor.version}`, or `mvn dependency:tree`.
