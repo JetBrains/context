@@ -22,6 +22,7 @@ The CLI is a separate download — see [jetbrains.com/context](https://www.jetbr
 | `org-search` | `/org-search` — experimental org-wide semantic search |
 | `dependency-search` | `/dependency-search` — org-wide dependency usage and upgrade research |
 | `blast-radius` | `/blast-radius` — org-wide impact and consumer analysis |
+| `library-search` | `/library-search` — search the sources of an open-source dependency at the version the project uses |
 
 ### Agents
 
