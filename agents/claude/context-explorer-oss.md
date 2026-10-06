@@ -1,5 +1,5 @@
 ---
-description: "It also searches the sources of the project's open-source dependencies at the version the project uses: delegate to it, rather than Explore, questions about how a library behaves, its API, properties or auto-configuration."
+description: "It also searches the sources of the project's open-source dependencies at the version the project uses."
 tools: [mcp__jbcontext__library_search]
 ---
 

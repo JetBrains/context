@@ -1,6 +1,6 @@
 ---
 name: library-search
-description: "Semantic search in the sources of an open-source library at the version the project depends on. The sources are usually not in the repository, and Maven/Gradle caches hold only binary jars.\n- Use this skill when you add or change a dependency, or configure a library through properties or auto-configuration (Spring Boot starters, Spring Cloud, springdoc, Testcontainers, etc.) and need its property names, defaults or conditions at this version; when compilation fails on a symbol from a library, or an error or stack trace comes from inside one; and before writing code against a library API whose signature or behavior at this version you are not sure of.\n- When not to use: for code inside the current project (use context-search), for libraries the project does not depend on, or when the library's source is already checked out locally."
+description: "Semantic search in the sources of an open-source library at the version the project depends on.\n- Use this skill when the answer depends on how a third-party dependency actually behaves: its defaults, configuration options, exceptions it throws, extension points, or an API whose signature you are unsure of for this version.\n- When not to use: for code inside the current project (use context-search), for libraries the project does not depend on, or when the library's source is already checked out locally."
 argument-hint: query dependency version
 ---
 
