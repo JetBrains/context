@@ -13,19 +13,24 @@ Use `jbcontext search-deps` to find code in the sources of a library the project
 ```bash
 jbcontext search-deps "<detailed and descriptive query>" <dependency> <version>
 jbcontext search-deps "<query>" <dependency> <version> --limit 5
+jbcontext search-deps "<query>" npm:lodash 4.17.21
 ```
 
-`<dependency>` is the library coordinate as declared in the build, e.g. Maven `group:artifact`. Always pass `<version>`, the one the project uses: without it the latest indexed version is searched, which may not match the project.
+`<dependency>` is the library name as the project declares it. Maven `group:artifact` goes as is; other ecosystems take a prefix: `npm:lodash`, `npm:@babel/core`, `pypi:requests`, `cargo:serde`, `go:github.com/x/y` (the module path). Always pass `<version>`, the one the project uses: without it the latest indexed version is searched, which may not match the project.
 
 ## Finding the version
 
 Read it from the project; do not guess it. If you cannot find it, ask the user.
 
-- Lock files hold the resolved version: `gradle.lockfile`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `Cargo.lock`, `go.sum`.
-- Gradle: `build.gradle(.kts)` declarations and version catalogs such as `gradle/libs.versions.toml`.
-- Maven: `pom.xml` `<dependency>` and `<dependencyManagement>`.
+A lock file holds the resolved version; prefer it to the range in the manifest.
 
-When the build file has a variable, a BOM or `platform(...)` instead of a literal version, or the dependency is transitive, ask the build for the resolved one:
+- Maven/Gradle: `gradle.lockfile`, `build.gradle(.kts)` declarations, version catalogs such as `gradle/libs.versions.toml`, `pom.xml` `<dependency>` and `<dependencyManagement>`.
+- npm: `package-lock.json` (`"node_modules/<name>"` -> `"version"`), `yarn.lock`, `pnpm-lock.yaml`; not the `^`/`~` range in `package.json`. `npm ls <name>` prints the installed one.
+- Cargo: `Cargo.lock` (`[[package]]` with `name = "<crate>"`); `cargo tree -i <crate>` when several versions are locked.
+- Go: `go.mod` `require <module> <version>`, after any `replace`; the version is a tag like `v1.2.0` or a pseudo-version like `v0.0.0-20240101120000-abcdef123456`, pass it as is. `go list -m <module>` prints the selected one.
+- PyPI: `poetry.lock`, `uv.lock`, `Pipfile.lock` or a pinned `requirements.txt` (`name==version`); `pip show <name>` in the project's environment.
+
+In a Maven or Gradle build, when the build file has a variable, a BOM or `platform(...)` instead of a literal version, or the dependency is transitive, ask the build for the resolved one:
 
 ```bash
 ./gradlew dependencyInsight --dependency <artifact> --configuration <runtimeClasspath|compileClasspath>
@@ -48,7 +53,7 @@ Searched io.ktor:ktor-client-core 3.1.1 in ktorio/ktor@0495b8b1c2d3, nearest to 
 
 ## When nothing is found
 
-- `Library ... is not indexed for library search.` - check the coordinates against the build file (exact group and artifact, not a plugin id or a BOM). Many projects publish several artifacts from one repository; try the core artifact. If it is still not indexed, fall back to the library's sources directly (GitHub, sources jar, IDE navigation).
+- `Library ... is not indexed for library search.` - check the name against the project (exact Maven group and artifact, not a plugin id or a BOM; the right prefix for other ecosystems; the Go module path, not a package inside it). Many projects publish several artifacts from one repository; try the core artifact. If it is still not indexed, fall back to the library's sources directly (GitHub, sources jar, IDE navigation).
 - `No relevant results found.` - the library is indexed, so rephrase: use the library's own vocabulary (class names, config option names, error messages) instead of the project's.
 
 ## Query Tips
