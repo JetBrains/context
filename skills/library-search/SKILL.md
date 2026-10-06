@@ -20,17 +20,17 @@ jbcontext search-deps "<query>" npm:lodash 4.17.21
 
 ## Finding the version
 
-Read it from the project; do not guess it. If you cannot find it, ask the user.
+Read it from the project; never guess it, even for a well-known library. If you cannot determine it, call without a version and say so in the answer rather than passing a made-up one.
 
 A lock file holds the resolved version; prefer it to the range in the manifest.
 
-- Maven/Gradle: `gradle.lockfile`, `build.gradle(.kts)` declarations, version catalogs such as `gradle/libs.versions.toml`, `pom.xml` `<dependency>` and `<dependencyManagement>`.
+- Maven/Gradle: `gradle.lockfile`, `build.gradle(.kts)` declarations, version catalogs such as `gradle/libs.versions.toml`, `pom.xml` `<dependency>` and `<dependencyManagement>`. A dependency declared without a version gets it from the parent pom (`spring-boot-starter-parent`), a BOM imported in `<dependencyManagement>`, a Gradle `platform(...)` or the Spring Boot plugin: a Spring Boot starter has the Spring Boot version.
 - npm: `package-lock.json` (`"node_modules/<name>"` -> `"version"`), `yarn.lock`, `pnpm-lock.yaml`; not the `^`/`~` range in `package.json`. `npm ls <name>` prints the installed one.
 - Cargo: `Cargo.lock` (`[[package]]` with `name = "<crate>"`); `cargo tree -i <crate>` when several versions are locked.
 - Go: `go.mod` `require <module> <version>`, after any `replace`; the version is a tag like `v1.2.0` or a pseudo-version like `v0.0.0-20240101120000-abcdef123456`, pass it as is. `go list -m <module>` prints the selected one.
 - PyPI: `poetry.lock`, `uv.lock`, `Pipfile.lock` or a pinned `requirements.txt` (`name==version`); `pip show <name>` in the project's environment.
 
-In a Maven or Gradle build, when the build file has a variable, a BOM or `platform(...)` instead of a literal version, or the dependency is transitive, ask the build for the resolved one:
+In a Maven or Gradle build, when the build file has no literal version (a variable, a parent, a BOM, `platform(...)`), the dependency is transitive, or you are unsure, ask the build for the resolved one:
 
 ```bash
 ./gradlew dependencyInsight --dependency <artifact> --configuration <runtimeClasspath|compileClasspath>
