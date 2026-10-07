@@ -73,6 +73,30 @@ the call goes through untouched.
 
 ## Install (Claude Code)
 
+### With the jbcontext CLI (shipped runtime)
+
+The router is ported into the jbcontext CLI as `jbcontext hook <event> --mode guidance`,
+a native binary with no python3 dependency. The node files are bundled from this repo's
+`guidance/` dir. On Claude, `setup-agent --auto` installs it by default:
+
+```bash
+jbcontext setup-agent --agent claude --auto                # router on
+jbcontext setup-agent --agent claude --auto --no-guidance  # baseline arm: router off
+```
+
+This writes three entries into `settings.json`:
+- `PreToolUse` `*` -> `jbcontext hook pre-tool-use --mode guidance`
+- `PostToolUse` `Agent|Task` -> `jbcontext hook post-tool-use --mode guidance`
+- `UserPromptSubmit` -> `jbcontext hook user-prompt-submit --mode guidance`
+
+The CLI port reads the same `GUIDANCE_*` variables (table below). Its default state
+and log dirs are `~/.jbcontext/guidance/{state,logs}`. `GUIDANCE_DISABLED=1` turns an
+installed router off.
+
+Both implementations must pass `parity_cases.json` (see Tests).
+
+### Manual (this Python script)
+
 `.claude/settings.json` (project) or `~/.claude/settings.json` (user); use the
 absolute path of this repo checkout:
 
@@ -130,3 +154,19 @@ python3 hooks/guidance/test_guidance_hook.py
 ```
 
 The tests use a fake classifier and an isolated `HOME`; they never call Jev.
+
+### Parity with the CLI port
+
+`parity_cases.json` holds the inputs and outputs that both implementations replay:
+- flows of hook calls with their outputs and log events;
+- tables for the pure functions (categorize, pre-filter, paths, patterns, anchors,
+  transcript reading, classifier state, winner).
+
+The inputs live in `parity_cases.py`; the expected values are recorded from this script.
+
+```bash
+python3 hooks/guidance/parity_cases.py --write   # after changing guidance_hook.py or a node file
+python3 hooks/guidance/parity_cases.py --check   # also run by test_guidance_hook.py
+```
+
+The CLI test `GuidanceParityTest` replays the same file against the Kotlin port.

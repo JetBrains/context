@@ -242,5 +242,18 @@ class TranscriptTest(unittest.TestCase):
         self.assertEqual(steps[1]["result"], "src/a.py:3: retry()")
 
 
+class ParityCasesTest(unittest.TestCase):
+    """parity_cases.json matches this router, so the CLI port can be checked against it."""
+
+    def test_recorded_cases_match_router(self):
+        import parity_cases
+        recorded = json.loads(parity_cases.OUT.read_text(encoding="utf-8"))
+        current = json.loads(parity_cases.render(parity_cases.build()))
+        for section in current:
+            self.assertEqual(recorded.get(section), current[section],
+                             f"parity_cases.json section '{section}' is stale: "
+                             "run python3 hooks/guidance/parity_cases.py --write and review the diff")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
