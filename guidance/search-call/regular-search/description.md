@@ -28,3 +28,6 @@ The search target is described by meaning rather than exact
 - 2+ lexical searches in this task returned results the agent didn't use
 - the previous grep output was large and mostly unrelated
 
+The agent needs a map across several components or a cross-module flow
+-> context-explorer (`../context-explorer/description.md`).
+

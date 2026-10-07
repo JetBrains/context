@@ -26,4 +26,5 @@ Typical needs (examples, not an exhaustive list):
   wants to look it up, verify, or enumerate it -> regular search
   (`../regular-search/description.md`).
 - Understanding needs a map: several components, a flow across modules, or
-  several distinct aspects at once -> explorer.
+  several distinct aspects at once -> context-explorer
+  (`../context-explorer/description.md`).
