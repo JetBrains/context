@@ -16,11 +16,11 @@ jbcontext search-deps "<query>" <dependency> <version> --limit 5
 jbcontext search-deps "<query>" npm:lodash 4.17.21
 ```
 
-`<dependency>` is the library name as the project declares it. Maven `group:artifact` goes as is; other ecosystems take a prefix: `npm:lodash`, `npm:@babel/core`, `pypi:requests`, `cargo:serde`, `go:github.com/x/y` (the module path). Always pass `<version>`, the one the project uses: without it the latest indexed version is searched, which may not match the project.
+`<dependency>` is the library name as the project declares it. Maven `group:artifact` goes as is; other ecosystems take a prefix: `npm:lodash`, `npm:@babel/core`, `pypi:requests`, `cargo:serde`, `go:github.com/x/y` (the module path). `<version>` is the one the project uses.
 
 ## Finding the version
 
-Read it from the project; never guess it, even for a well-known library. If you cannot determine it, call without a version and say so in the answer rather than passing a made-up one.
+Read it from the project; never guess it, even for a well-known library.
 
 A lock file holds the resolved version; prefer it to the range in the manifest.
 
@@ -47,7 +47,6 @@ The first line names what was actually searched, for example:
 Searched io.ktor:ktor-client-core 3.1.1 in ktorio/ktor@0495b8b1c2d3, nearest to 3.0.3
 ```
 
-- `Version not specified, searched the latest indexed ...` means no version was passed: the answer describes the latest indexed version, which may differ from the project's. Find the version and search again, or say so in the answer.
 - `nearest to <requested>` means the requested version is not indexed and the closest indexed one was searched instead. Behavior can differ between versions: say so when the answer depends on details that may have changed.
 - Each result has a `Source:` link to the file on GitHub at that commit. Use it (or `gh api`) to read the full file around the snippet before relying on it.
 
