@@ -32,13 +32,16 @@ export type JbSavings = {
   measuredSessions: number
   exploreTokens: number
   savedTokens: number
-  // Blended Exploring-phase price from `jbcontext analyze`; null until that ran once today.
+  // Blended Exploring-phase price from `jbcontext analyze`; null until that succeeded today.
   usdPerToken: number | null
 }
 
 export type JbView = {
+  // This repository's, newest first; the other repositories' only counted.
   searches: JbSearch[]
   errors: JbError[]
+  otherSearches: number
+  otherErrors: number
   index: JbIndex | null
   repositoryId: string | null
   // The repository the session runs in, as the stats files spell repositories.

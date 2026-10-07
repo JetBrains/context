@@ -13,9 +13,9 @@ A Claude Code mod that shows what `jbcontext` is doing in the repository you are
 
 ## Where the data comes from
 
-- Searches and errors: the CLI's local stats files, `$JBCONTEXT_HOME/stats/YYYY-MM-DD.json` (default `~/.jbcontext`), last 7 days. A search or error belongs to this repository when its recorded repository URL matches, or, when it records none, when it ran inside the session's directory.
+- Searches and errors: the CLI's local stats files, `$JBCONTEXT_HOME/stats/YYYY-MM-DD.json` (default `~/.jbcontext`), last 7 days. A search or error belongs to this repository when its recorded repository URL matches, or, when it records none, when it ran inside the session's directory. An error that records neither a repository nor a directory (an expired token, say) shows in every repository.
 - Index status: `git rev-parse` and `jbcontext status --json-output`, at session start, every 2 minutes, and after `jbcontext index`.
-- Savings: `jbcontext analyze --status --transcript <file> --json-output` for each of today's Claude transcripts of this directory (and `.claude/worktrees/*` under it). Saved tokens count only sessions that used jbcontext and that the CLI has an eval-backed reduction for; the $ figure uses the Exploring-phase price from `jbcontext analyze --json-output`, taken once a day. A blended price across all agents and models: an estimate, not a bill.
+- Savings: `jbcontext analyze --status --transcript <file> --json-output` for each of today's Claude transcripts of this directory (and `.claude/worktrees/*` under it), while the pane is open. Saved tokens count only sessions that used jbcontext and that the CLI has an eval-backed reduction for; the $ figure uses the Exploring-phase price from `jbcontext analyze --json-output`, taken once a day, and retried hourly when that run fails. A blended price across all agents and models: an estimate, not a bill.
 
 Nothing leaves the machine beyond what `jbcontext` itself does.
 

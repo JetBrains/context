@@ -74,9 +74,9 @@ export function parseStatsDay(text: string): DayEvents {
   return { searches, errors }
 }
 
-export function mergeDays(days: DayEvents[], limit: number): DayEvents {
+export function mergeDays(days: DayEvents[]): DayEvents {
   const byTimeDesc = <T extends { at: number }>(a: T, b: T) => b.at - a.at
-  const searches = days.flatMap(day => day.searches).sort(byTimeDesc).slice(0, limit)
+  const searches = days.flatMap(day => day.searches).sort(byTimeDesc)
   const seen = new Set<string>()
   const errors = days
     .flatMap(day => day.errors)
@@ -87,9 +87,23 @@ export function mergeDays(days: DayEvents[], limit: number): DayEvents {
       seen.add(id)
       return true
     })
-    .slice(0, limit)
 
   return { searches, errors }
+}
+
+export type RepoEvents = DayEvents & { otherSearches: number; otherErrors: number }
+
+// The repository's newest `limit` searches and errors, the rest counted; filtered
+// before the limit, so busy other repositories never push this one's out.
+export function scopeToRepo(events: DayEvents, repoKey: string | null, cwd: string, limit: number): RepoEvents {
+  const searches = events.searches.filter(search => isInRepo(search, repoKey, cwd))
+  const errors = events.errors.filter(error => isErrorInRepo(error, repoKey, cwd))
+  return {
+    searches: searches.slice(0, limit),
+    errors: errors.slice(0, limit),
+    otherSearches: events.searches.length - searches.length,
+    otherErrors: events.errors.length - errors.length,
+  }
 }
 
 type RawSnapshot = { revision?: string; branches?: string[]; createdAt?: number }
@@ -165,6 +179,12 @@ export function isInRepo(item: Scoped, repoKey: string | null, cwd: string): boo
   if (repoKey !== null && item.repos.some(repo => normalizeRepo(repo) === repoKey)) return true
   if (item.repos.length > 0 || item.projectRoot === null || cwd === '') return false
   return cwd === item.projectRoot || cwd.startsWith(`${item.projectRoot}/`)
+}
+
+// An error that names neither a repository nor a directory (an expired token, say)
+// concerns every repository.
+export function isErrorInRepo(error: JbError, repoKey: string | null, cwd: string): boolean {
+  return (error.repos.length === 0 && error.projectRoot === null) || isInRepo(error, repoKey, cwd)
 }
 
 export function repoName(repo: string): string {

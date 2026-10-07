@@ -10,7 +10,6 @@ import {
   firstLine,
   formatTokens,
   formatUsd,
-  isInRepo,
   mergeDays,
   normalizeRepo,
   parseSessionStatus,
@@ -18,9 +17,10 @@ import {
   parseStatus,
   repoName,
   savedTokens,
+  scopeToRepo,
   touchesJbcontext,
 } from './model'
-import type { SessionStatus } from './model'
+import type { DayEvents, RepoEvents, SessionStatus } from './model'
 
 const PANE = 'jbcontext'
 const STATS_POLL_MS = 5_000
@@ -29,6 +29,7 @@ const STATS_DAYS = 7
 const KEPT = 200
 const MAX_SESSIONS_SCANNED = 40
 const PRICE_KEY = 'explorePrice'
+const PRICE_RETRY_MS = 60 * 60 * 1000
 
 const view = atom({ plugin: 'jbcontext-watch', key: 'view' } as const, null as JbView | null)
 const isBandHidden = atom({ plugin: 'jbcontext-watch', key: 'isBandHidden' } as const, false)
@@ -36,6 +37,8 @@ const isBandHidden = atom({ plugin: 'jbcontext-watch', key: 'isBandHidden' } as 
 const EMPTY: JbView = {
   searches: [],
   errors: [],
+  otherSearches: 0,
+  otherErrors: 0,
   index: null,
   repositoryId: null,
   repoKey: null,
@@ -48,10 +51,13 @@ let appHome = ''
 let claudeHome = ''
 let cwd = ''
 let statsStamp = ''
+// Every repository's searches and errors from the stats files, scoped to this one
+// whenever it or the repository changes.
+let statsEvents: DayEvents = { searches: [], errors: [] }
+let isStatsRunning = false
 let isStatusRunning = false
 let isSavingsRunning = false
 let isPriceRunning = false
-let isPaneOpen = false
 const sessionCache = new Map<string, { mtimeMs: number; status: SessionStatus | null }>()
 
 function patch($: EngineInterface, fn: (current: JbView) => Partial<JbView>) {
@@ -61,33 +67,48 @@ function patch($: EngineInterface, fn: (current: JbView) => Partial<JbView>) {
   })
 }
 
+function inRepo(repoKey: string | null): RepoEvents {
+  return scopeToRepo(statsEvents, repoKey, cwd, KEPT)
+}
+
+// The engine's record, which outlives a reload of this module.
+async function isPaneOpen($: EngineInterface): Promise<boolean> {
+  return (await $.ui.panes()).some(pane => pane.id === PANE)
+}
+
 async function jbcontextBinary($: EngineInterface): Promise<string> {
   const bundled = `${appHome}/bin/jbcontext`
   return (await $.fs.exists(bundled)) ? bundled : 'jbcontext'
 }
 
 async function refreshStats($: EngineInterface) {
-  const dir = `${appHome}/stats`
-  let entries
+  if (isStatsRunning) return
+  isStatsRunning = true
   try {
-    entries = await $.fs.list(dir)
-  } catch {
-    return
-  }
-  const days = entries
-    .filter(entry => entry.kind === 'file' && /^\d{4}-\d{2}-\d{2}\.json$/.test(entry.name))
-    .sort((a, b) => b.name.localeCompare(a.name))
-    .slice(0, STATS_DAYS)
-  const stamp = days.map(day => `${day.name}:${day.mtimeMs}:${day.size}`).join('|')
-  if (stamp === statsStamp) return
-  statsStamp = stamp
+    const dir = `${appHome}/stats`
+    let entries
+    try {
+      entries = await $.fs.list(dir)
+    } catch {
+      return
+    }
+    const days = entries
+      .filter(entry => entry.kind === 'file' && /^\d{4}-\d{2}-\d{2}\.json$/.test(entry.name))
+      .sort((a, b) => b.name.localeCompare(a.name))
+      .slice(0, STATS_DAYS)
+    const stamp = days.map(day => `${day.name}:${day.mtimeMs}:${day.size}`).join('|')
+    if (stamp === statsStamp) return
+    statsStamp = stamp
 
-  const parsed = await Promise.all(
-    days.map(async day => parseStatsDay(await $.fs.read(`${dir}/${day.name}`).catch(() => ''))),
-  )
-  const { searches, errors } = mergeDays(parsed, KEPT)
-  const now = await $.clock.now()
-  await patch($, () => ({ searches, errors, updatedAt: now }))
+    const parsed = await Promise.all(
+      days.map(async day => parseStatsDay(await $.fs.read(`${dir}/${day.name}`).catch(() => ''))),
+    )
+    statsEvents = mergeDays(parsed)
+    const now = await $.clock.now()
+    await patch($, current => ({ ...inRepo(current.repoKey), updatedAt: now }))
+  } finally {
+    isStatsRunning = false
+  }
 }
 
 async function refreshStatus($: EngineInterface) {
@@ -105,7 +126,10 @@ async function refreshStatus($: EngineInterface) {
       return
     }
     const originKey = origin.exitCode === 0 ? normalizeRepo(origin.stdout) : null
-    await patch($, current => ({ repoKey: current.repoKey ?? originKey }))
+    await patch($, current => {
+      const repoKey = current.repoKey ?? originKey
+      return { repoKey, ...inRepo(repoKey) }
+    })
 
     const status = await $.process.run([await jbcontextBinary($), 'status', '--json-output'], {
       cwd,
@@ -122,7 +146,7 @@ async function refreshStatus($: EngineInterface) {
             },
           }
     const repoKey = summary.repositoryId ? normalizeRepo(summary.repositoryId) : originKey
-    await patch($, () => ({ ...summary, repoKey }))
+    await patch($, () => ({ ...summary, repoKey, ...inRepo(repoKey) }))
   } catch (error) {
     await patch($, () => ({
       index: { state: 'unavailable', reason: `jbcontext status failed: ${String(error)}` },
@@ -140,10 +164,13 @@ function localDay(now: number): { key: string; startMs: number } {
 }
 
 // `jbcontext analyze` has no repository or date filter, and a full run reads every
-// session on the machine (~20 s), so its Exploring price is taken once a day.
-async function refreshPrice($: EngineInterface, day: string) {
-  const cached = (await $.store.get(PRICE_KEY)) as { day: string; usdPerToken: number | null } | undefined
-  if (cached?.day === day) {
+// session on the machine (~20 s), so its Exploring price is taken once a day; a run
+// that failed, timed out or found no price is tried again after an hour.
+async function refreshPrice($: EngineInterface, day: string, now: number) {
+  const cached = (await $.store.get(PRICE_KEY)) as
+    | { day: string; usdPerToken: number | null; checkedAt?: number }
+    | undefined
+  if (cached?.day === day && (cached.usdPerToken !== null || now - (cached.checkedAt ?? 0) < PRICE_RETRY_MS)) {
     await patch($, current => ({
       savings: current.savings ? { ...current.savings, usdPerToken: cached.usdPerToken } : current.savings,
     }))
@@ -152,12 +179,11 @@ async function refreshPrice($: EngineInterface, day: string) {
   if (isPriceRunning) return null
   isPriceRunning = true
   try {
-    const analyze = await $.process.run([await jbcontextBinary($), 'analyze', '--json-output'], {
-      cwd,
-      timeoutMs: 180_000,
-    })
-    const usdPerToken = analyze.exitCode === 0 ? explorePrice(analyze.stdout) : null
-    await $.store.set(PRICE_KEY, { day, usdPerToken })
+    const analyze = await $.process
+      .run([await jbcontextBinary($), 'analyze', '--json-output'], { cwd, timeoutMs: 180_000 })
+      .catch(() => null)
+    const usdPerToken = analyze?.exitCode === 0 ? explorePrice(analyze.stdout) : null
+    await $.store.set(PRICE_KEY, { day, usdPerToken, checkedAt: now })
     await patch($, current => ({
       savings: current.savings ? { ...current.savings, usdPerToken } : current.savings,
     }))
@@ -223,10 +249,16 @@ async function refreshSavings($: EngineInterface) {
         usdPerToken: previous,
       },
     }))
-    if (statuses.length > 0) void refreshPrice($, today.key)
+    if (statuses.length > 0) void refreshPrice($, today.key, now)
   } finally {
     isSavingsRunning = false
   }
+}
+
+// Savings show only in the pane, and scanning them runs `jbcontext analyze` for each
+// changed transcript, so a closed pane skips it.
+async function refreshSavingsIfShown($: EngineInterface) {
+  if (await isPaneOpen($)) await refreshSavings($)
 }
 
 export const register: Register = on => {
@@ -247,11 +279,15 @@ export const register: Register = on => {
 
     void refreshStats($)
     void refreshStatus($)
-    void refreshSavings($)
-    $.clock.every(STATS_POLL_MS, () => void refreshStats($))
+    void refreshSavingsIfShown($)
+    $.clock.every(STATS_POLL_MS, () => {
+      void refreshStats($)
+      // The "ago" times and the indexing clock move with no state write to redraw them.
+      $.ui.invalidate('ui.render')
+    })
     $.clock.every(STATUS_POLL_MS, () => {
       void refreshStatus($)
-      void refreshSavings($)
+      void refreshSavingsIfShown($)
     })
 
     return started
@@ -262,21 +298,14 @@ export const register: Register = on => {
       const hidden = await update($, isBandHidden, value => !value)
       return { text: hidden ? 'jbcontext band hidden.' : 'jbcontext band shown while Claude works.' }
     }
-    if (isPaneOpen || e.args.trim() === 'close') {
+    if (e.args.trim() === 'close' || (await isPaneOpen($))) {
       await $.ui.close({ id: PANE })
-      isPaneOpen = false
       return { text: 'jbcontext pane closed.' }
     }
     void refreshStatus($)
     void refreshSavings($)
     await $.ui.open({ id: PANE, title: 'jbcontext' })
-    isPaneOpen = true
     return { text: 'jbcontext pane opened.' }
-  })
-
-  on('ui.close', async ($, e, next) => {
-    if (e.id === PANE) isPaneOpen = false
-    return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
@@ -310,8 +339,8 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const now = await $.clock.now()
     const index = describeIndex(current.index, now)
-    const search = current.searches.find(one => isInRepo(one, current.repoKey, cwd))
-    const error = current.errors.find(one => isInRepo(one, current.repoKey, cwd))
+    const search = current.searches[0]
+    const error = current.errors[0]
     const isFreshError = error !== undefined && now - error.at < 60 * 60 * 1000
 
     return (
@@ -357,11 +386,7 @@ export const register: Register = on => {
     const current = (await read($, view)) ?? EMPTY
     const now = await $.clock.now()
     const index = describeIndex(current.index, now)
-    const repoKey = current.repoKey
-    const searches = current.searches.filter(search => isInRepo(search, repoKey, cwd))
-    const errors = current.errors.filter(error => isInRepo(error, repoKey, cwd))
-    const otherSearches = current.searches.length - searches.length
-    const otherErrors = current.errors.length - errors.length
+    const { searches, errors, otherSearches, otherErrors, repoKey } = current
     const repoLabel = repoKey ? repoName(repoKey) : 'this repository'
 
     const rows = Math.max(6, (e.viewport?.rows ?? 30) - 14)

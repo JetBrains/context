@@ -10,8 +10,10 @@ import {
   parseStatsDay,
   parseStatus,
   savedTokens,
+  scopeToRepo,
   touchesJbcontext,
 } from '../hooks/model'
+import type { JbError, JbSearch } from '../types'
 
 const NOW = Date.parse('2026-10-07T10:00:00Z')
 const HEAD = 'a6f44ddb12b8657bd682019566d0f3ff7449f590'
@@ -71,7 +73,7 @@ const ran = (stdout: string) => ({
 })
 
 test('stats files yield searches and failures, api calls ignored', () => {
-  const { searches, errors } = mergeDays([parseStatsDay(DAY), parseStatsDay('not json')], 20)
+  const { searches, errors } = mergeDays([parseStatsDay(DAY), parseStatsDay('not json')])
   expect(searches.map(search => search.query)).toEqual(['air assistant button', 'where is the stats writer'])
   expect(searches[1]?.client).toBe('code_search')
   expect(errors.map(error => error.message)).toEqual(['Token is expired'])
@@ -108,6 +110,35 @@ test('repo scope matches by URL, or by directory when no URL is recorded', () =>
   expect(isInRepo({ repos: [], projectRoot: null }, key, '/r')).toBe(false)
 })
 
+test('repo scope keeps errors that name no repository and limits after filtering', () => {
+  const key = 'github.com/acme/widgets'
+  const search = (at: number, repo: string): JbSearch => ({
+    at,
+    query: `${repo} ${at}`,
+    kind: 'semantic',
+    client: 'CLI',
+    repos: [repo],
+    results: 1,
+    durationMs: 1,
+    success: true,
+    projectRoot: null,
+  })
+  const error = (at: number, repos: string[]): JbError => ({ at, source: 'error', message: `e${at}`, repos, projectRoot: null })
+  const scoped = scopeToRepo(
+    {
+      searches: [search(4, 'github.com/x/y'), search(3, 'github.com/x/y'), search(2, key), search(1, key)],
+      errors: [error(3, ['github.com/x/y']), error(2, []), error(1, [key])],
+    },
+    key,
+    '/r',
+    1,
+  )
+  expect(scoped.searches.map(one => one.at)).toEqual([2])
+  expect(scoped.otherSearches).toBe(2)
+  expect(scoped.errors.map(one => one.message)).toEqual(['e2'])
+  expect(scoped.otherErrors).toBe(1)
+})
+
 test('savings count only sessions that used jbcontext with a measured reduction', () => {
   expect(savedTokens({ exploreTokens: 3_000_000, reductionPct: 25, embarkInvoked: true })).toBe(1_000_000)
   expect(savedTokens({ exploreTokens: 3_000_000, reductionPct: 25, embarkInvoked: false })).toBe(0)
@@ -134,6 +165,7 @@ test('band shows index status and the last search while Claude works', async ($,
   }))
   on('fs.read', async () => ({ value: DAY }))
   on('fs.exists', async () => ({ value: true }))
+  on('ui.panes', async () => ({ value: [] }))
   on('session.start', async (_$, e) => ({ cwd: e.cwd }))
   on('command.register', async (_$, e) => ({ value: { command: e.name } }))
   on('ui.render', async ($, e) => {
@@ -193,4 +225,83 @@ test('band shows index status and the last search while Claude works', async ($,
     expect(await pane.find({ text: /Token is expired/ })).toBeDefined()
     await pane.unmount()
   }
+})
+
+test('the pane toggles from the engine record; savings scan only while it is open; a failed price is retried', async ($, on) => {
+  mock.env(on, { HOME: '/home/dev' })
+  const clock = mock.clock(on, { now: NOW })
+  mock.store(on)
+  let transcriptMtime = NOW
+  on('fs.list', async (_$, e) => ({
+    value:
+      e.path === '/home/dev/.claude/projects'
+        ? [{ name: '-repo', kind: 'dir' as const, size: 0, mtimeMs: 0, isLink: false }]
+        : e.path === '/home/dev/.claude/projects/-repo'
+          ? [{ name: 'session.jsonl', kind: 'file' as const, size: 1, mtimeMs: transcriptMtime, isLink: false }]
+          : [],
+  }))
+  on('fs.exists', async () => ({ value: false }))
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', async (_$, e) => ({ value: { command: e.name } }))
+  on('ui.render', async ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, 'engine') as RenderElement
+  })
+  let isOpen = false
+  on('ui.panes', async () => ({
+    value: isOpen ? [{ id: 'jbcontext', title: 'jbcontext', isShown: true, isFocused: false, isPlaced: true }] : [],
+  }))
+  on('ui.open', async () => ((isOpen = true), { value: { isPlaced: true as const } }))
+  on('ui.close', async () => ((isOpen = false), { value: undefined }))
+
+  const runs: string[] = []
+  const ANALYZE = JSON.stringify({ phaseBreakdown: [{ phase: 'Exploring', totalTokensBilled: 2_000_000, totalCostUsd: 1.5 }] })
+  on('process.run', async (_$, e) => {
+    if (e.argv[0] === 'git') return ran(e.argv.includes('--abbrev-ref') ? 'main\n' : `${HEAD}\n`)
+    if (e.argv.includes('--status')) {
+      runs.push('session')
+      return ran(JSON.stringify({ exploreTokens: 3_000_000, reductionPct: 25, embarkInvoked: true }))
+    }
+    if (e.argv.includes('analyze')) {
+      runs.push('price')
+      if (runs.filter(run => run === 'price').length === 1) throw new Error('timed out')
+      return ran(ANALYZE)
+    }
+    return ran(STATUS)
+  })
+
+  const pane = async (text: RegExp) => {
+    const ui = await $.ui.mount({
+      plugin: 'jbcontext-watch',
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'jbcontext',
+      props: { title: 'jbcontext', bodyColumns: 120 } as never,
+    })
+    const found = await ui.find({ text })
+    await ui.unmount()
+    return found
+  }
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal' } as never)
+  await clock.settle()
+  expect(runs).toEqual([])
+
+  expect((await $.command.run({ command: 'jbcontext', args: '' } as never)).text).toBe('jbcontext pane opened.')
+  await clock.settle()
+  expect(runs).toEqual(['session', 'price'])
+  expect(await pane(/Saved ≈ 1M tokens/)).toBeDefined()
+  expect(await pane(/once `jbcontext analyze` has run/)).toBeDefined()
+
+  await clock.advance(120_000)
+  expect(runs).toEqual(['session', 'price'])
+
+  await clock.advance(60 * 60 * 1000)
+  expect(runs).toEqual(['session', 'price', 'price'])
+  expect(await pane(/≈ \$0\.75/)).toBeDefined()
+
+  expect((await $.command.run({ command: 'jbcontext', args: '' } as never)).text).toBe('jbcontext pane closed.')
+  transcriptMtime = NOW + 1
+  await clock.advance(120_000)
+  expect(runs).toEqual(['session', 'price', 'price'])
 })
