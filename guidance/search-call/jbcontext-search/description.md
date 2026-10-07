@@ -28,3 +28,6 @@ Typical needs (examples, not an exhaustive list):
 - Understanding needs a map: several components, a flow across modules, or
   several distinct aspects at once -> context-explorer
   (`../context-explorer/description.md`).
+- Against context-explorer: if one well-formed query can answer
+it, this node; if the answer needs several queries whose results must be
+combined, context-explorer.

@@ -1,6 +1,6 @@
 ---
 name: context-explorer
-description: "Iteratively explore an unfamiliar codebase using semantic search. Provide a 1-2 sentence intent describing what you need to understand or locate. The agent runs up to 3 semantic searches, reads promising files to verify, and returns concrete file:line references **with inline code snippets** plus notes on confidence so the parent agent does not need to re-read the same files. Use when the task asks 'where is X', 'how does Y work', or describes behavior/intent without naming exact symbols. Skip when the task already names an exact file, class, or symbol (keyword grep is faster there), or when the task isn't code discovery at all - git operations (rebase, merge, commit), test/build runs, shell/statusline/config setup, or reviewing a diff already in hand."
+description: "Iteratively explore an unfamiliar codebase using semantic search. Maps code across several components using semantic search and targeted reads. Provide a 1-2 sentence intent describing what you need to understand or locate. The agent runs up to 3 semantic searches, reads promising files to verify, and returns concrete file:line references **with inline code snippets** plus notes on confidence so the parent agent does not need to re-read the same files."
 tools: [mcp__jbcontext__code_search, Read, Grep, Glob]
 model: haiku
 ---

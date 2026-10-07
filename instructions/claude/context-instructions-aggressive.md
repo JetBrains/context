@@ -8,4 +8,5 @@ concept, or pattern, or code similar to a snippet, when you don't know the exact
 Run `jbcontext search "<query>"` or use the `/context-search` skill.
 Results are ranked file paths with code snippets and line numbers.
 
-More specific guidance on using it may arrive during the task, for example in a hook message on a tool call.
+More specific guidance on using it may arrive during the task in a hook message on a tool call.
+A search call may also be denied with a reason that names a better-suited search method; that is guidance, not an error - follow it.
