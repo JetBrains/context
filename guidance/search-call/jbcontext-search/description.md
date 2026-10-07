@@ -1,9 +1,9 @@
 # Node: jbcontext search
 
 The agent wants to find something in the repo by WHAT IT DOES OR MEANS
-(information, a pattern, a behavior) and was not told exactly where to start
-for it (no file, snippet, or exact name of the target). Exact names it
-doesn't know yet would have to be guessed.
+(information, a pattern, a behavior), and neither the user nor the session
+has given it an exact place to start for it (no file, snippet, or established
+name of the target). Exact names it doesn't know yet would have to be guessed.
 
 Typical needs (examples, not an exhaustive list):
 
@@ -17,17 +17,17 @@ Typical needs (examples, not an exhaustive list):
 - code related to a known location by meaning, not by name: what else
   handles the same event, data, or concern
 - tests, docs, or config that cover a behavior
-- grep was tried with guessed words and missed (2+ unused results, or a
-  concept-word grep over the repo root)
+- lexical search with guessed words was already tried in this session and
+  missed (empty or unused results, or a concept word searched over the whole repo)
 
 ## Not when
 
-- The target itself is exact (named symbol, path, literal) and the agent
-  wants to look it up, verify, or enumerate it -> regular search
-  (`../regular-search/description.md`).
+- The target is exact: the agent already knows its name (symbol, path,
+  literal) from the user or the session, and wants to look it up, verify,
+  or enumerate it -> regular search (`../regular-search/description.md`).
 - Understanding needs a map: several components, a flow across modules, or
   several distinct aspects at once -> context-explorer
   (`../context-explorer/description.md`).
-- Against context-explorer: if one well-formed query can answer
-it, this node; if the answer needs several queries whose results must be
-combined, context-explorer.
+- Against context-explorer: if one well-formed query can answer it, this
+  node; if the answer needs several queries whose results must be combined,
+  context-explorer.

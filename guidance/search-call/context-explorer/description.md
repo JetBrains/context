@@ -14,6 +14,8 @@ Typical needs (examples, not an exhaustive list):
 - trace how a setting travels from where it is read to where it takes effect
 - all components involved when X happens (handlers, listeners, caches, persistence)
 - how a request flows through the layers of a subsystem before it fails
+- explain how a feature works end to end (how X is computed, evaluated, or
+  collected) when that spans several files or modules
 - every place that must change together to add a new variant of X
   (registration, handling, serialization, tests), when those places are unknown
 
@@ -21,8 +23,8 @@ Typical needs (examples, not an exhaustive list):
 
 - The target is a single concept or behavior that one semantic search can locate
   -> jbcontext search (`../jbcontext-search/description.md`).
-- The target is exact (named symbol, path, literal) or needs exhaustive enumeration
-  -> regular search (`../regular-search/description.md`).
+- The target is exact (a name the agent already knows from the user or the session)
+  or needs exhaustive enumeration -> regular search (`../regular-search/description.md`).
 - The relevant files are already identified in this session; the agent is now
   reading, verifying, or editing them.
 - Not a code-discovery task (git, build/test runs, environment, reviewing a diff).

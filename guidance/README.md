@@ -22,6 +22,8 @@ This guidance replaces the how-to and when-to-use parts of the static Claude
 instructions (`instructions/claude/`). Those now only say that the tool exists
 and what it is good for. The shared `context-search` skill is left as is.
 
+Router implementation (Claude Code hooks): `hooks/guidance/`.
+
 ## Interrupt points
 
 | Point | Hook | Nodes |
@@ -32,11 +34,19 @@ Multi-repo search is a future node. (Not planned during hackathon)
 
 ## Decision
 
-The classifier returns a probability for each node: `regular-search`,
-`jbcontext-search`, `context-explorer`. The most probable node wins (argmax).
+A regular search that is exact by itself - a narrow or meta path, or a
+search for a name the user or the session already established - is allowed
+without the classifier.
+
+Otherwise the classifier gets the session context and the agent's recent
+reasoning, but not the pending call, and returns a probability for each node:
+`regular-search`, `jbcontext-search`, `context-explorer`. The most probable
+node wins (argmax).
 
 - If the winning node is the one the pending call already uses, proceed and do
   not deny the tool call.
+- If the winner is not confident (below 0.75 among the nodes still allowed),
+  also proceed.
 - Otherwise deny the pending call and give the winning node's guidance as the
   reason: for `jbcontext-search` its `instruction.md` / `instruction-mcp.md`,
   for `context-explorer` its `instruction.md`, for `regular-search` a short
