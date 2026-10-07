@@ -170,7 +170,8 @@ test('band shows index status and the last search while Claude works', async ($,
       ui = await $.ui.mount({ plugin: 'jbcontext-watch', surface, component: 'AbovePrompt', props: band(true) as never })
     }
     expect((await ui.find({ text: /main @ a6f44ddb indexed 1h ago/ }))).toBeDefined()
-    expect((await ui.find({ text: /air assistant button/ }))).toBeDefined()
+    expect((await ui.find({ text: /where is the stats writer/ }))).toBeDefined()
+    expect(await ui.find({ text: /air assistant button/ })).toBeUndefined()
     expect((await ui.find({ text: /Token is expired/ }))).toBeDefined()
     await ui.unmount()
 

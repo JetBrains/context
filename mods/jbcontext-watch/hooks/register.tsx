@@ -310,32 +310,42 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const now = await $.clock.now()
     const index = describeIndex(current.index, now)
-    const search = current.searches[0]
-    const error = current.errors[0]
+    const search = current.searches.find(one => isInRepo(one, current.repoKey, cwd))
+    const error = current.errors.find(one => isInRepo(one, current.repoKey, cwd))
     const isFreshError = error !== undefined && now - error.at < 60 * 60 * 1000
 
     return (
-      <Box flexDirection="column" width={e.props.bodyColumns}>
+      <Box
+        flexDirection="column"
+        width={e.props.bodyColumns}
+        borderStyle="round"
+        borderColor="inactive"
+        paddingX={1}
+      >
         <Text wrap="truncate-end">
-          <Text color="claude" bold>jbcontext </Text>
+          <Text color="claude" bold>jbcontext</Text>
+          {'  '}
           {current.indexingSince !== null ? (
-            <Text color="suggestion">indexing… {ago(current.indexingSince, now).replace(' ago', '')}</Text>
+            <Text color="suggestion">indexing... {ago(current.indexingSince, now).replace(' ago', '')}</Text>
           ) : (
             <Text color={index.color}>{index.text}</Text>
           )}
         </Text>
         {search && (
-          <Text wrap="truncate-end" dimColor>
-            {'  last search '}
-            {ago(search.at, now)}: “{search.query}” → {search.results ?? '?'} results
-            {search.durationMs !== null ? ` in ${(search.durationMs / 1000).toFixed(1)}s` : ''}
+          <Text wrap="truncate-end">
+            <Text dimColor>search {ago(search.at, now).padEnd(8)}</Text>
+            {search.query}
+            <Text dimColor>
+              {'  '}
+              {search.results ?? '?'} hits
+              {search.durationMs !== null ? ` in ${(search.durationMs / 1000).toFixed(1)}s` : ''}
+            </Text>
           </Text>
         )}
         {isFreshError && (
-          <Text wrap="truncate-end" color="error">
-            {'  '}
-            {error.source}
-            {error.repos[0] ? ` (${repoName(error.repos[0])})` : ''} {ago(error.at, now)}: {error.message}
+          <Text wrap="truncate-end">
+            <Text color="error">{error.source} {ago(error.at, now).padEnd(8)}</Text>
+            {error.message}
           </Text>
         )}
       </Box>

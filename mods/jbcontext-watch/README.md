@@ -2,7 +2,7 @@
 
 A Claude Code mod that shows what `jbcontext` is doing in the repository you are working in:
 
-- **Band above the prompt, while Claude works**: the index status of the current branch (HEAD indexed, stale, missing, or `indexing...` while Claude runs `jbcontext index`), the latest search, and any error from the last hour.
+- **Band above the prompt, while Claude works**: the index status of the current branch (HEAD indexed, stale, missing, or `indexing...` while Claude runs `jbcontext index`), and this repository's latest search and any error from the last hour, in a dim frame.
 - **`/jbcontext` pane**: the index status, today's exploration in this repository's Claude sessions with the estimated tokens and $ saved by jbcontext, and the latest searches and errors, filtered to this repository.
 
 | Command | Does |
