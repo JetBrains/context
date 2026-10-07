@@ -19,7 +19,17 @@ A Claude Code mod that shows what `jbcontext` is doing in the repository you are
 
 Nothing leaves the machine beyond what `jbcontext` itself does.
 
-## Run it
+## Install
+
+At the prompt of a Claude Code terminal session:
+
+```
+/plugin install jbcontext-watch --marketplace JetBrains/context
+```
+
+Answer `y` to add the marketplace, then pick the user scope to load it in every session.
+
+To run a local checkout for one session instead:
 
 ```bash
 claude --plugin-dir /path/to/context/mods/jbcontext-watch
