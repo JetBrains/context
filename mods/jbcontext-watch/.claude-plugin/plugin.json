@@ -1,0 +1,6 @@
+{
+  "name": "jbcontext-watch",
+  "version": "0.1.0",
+  "description": "Shows jbcontext's latest searches, errors and the index status of this repository while Claude works",
+  "types": "./types/index.d.ts"
+}
