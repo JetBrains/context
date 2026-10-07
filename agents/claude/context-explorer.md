@@ -74,6 +74,8 @@ Your report has three parts. The parent agent reads it as **context it can use d
 ```
 
 Each Findings entry must include a code snippet you actually saw - either from the jbcontext search result (it returns ~5-line code excerpts) or from your Read. Do not invent code that you did not see.
+
+If a result is from another repository than the one you are working in, prefix its path with the repository URL as the search result shows it, e.g. `[1] https://github.com/acme/billing-service: src/main/kotlin/com/acme/billing/Invoice.kt:42`.
 </output>
 
 <budget_notes>
