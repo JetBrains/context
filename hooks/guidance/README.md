@@ -40,7 +40,7 @@ node's guidance at the moment of the call. Node definitions and decision rules:
    This applies to every regular search, also after the episode has a decision.
    Only the pattern is used here; it is never sent to the classifier.
 4. **Classify once per episode.** The first routable call that passes the
-   pre-filter sends Jev a `choice` question whose options are the three
+   pre-filter asks the classifier (Claude Haiku by default, or Jev) to pick one of the three
    `description.md` files. The state comes from `transcript_path`: the last
    `GUIDANCE_RECENT_STEPS` tool calls with their results, the agent's reasoning
    between them (visible text, and thinking text when the transcript keeps it),
@@ -122,6 +122,11 @@ Keep the hook `timeout` above `GUIDANCE_JEV_TIMEOUT`.
 
 | Variable | Default | |
 |---|---|---|
+| `GUIDANCE_CLASSIFIER` | `haiku` | `haiku` (Anthropic Messages API, one forced `route` tool call) or `jev` |
+| `GUIDANCE_ANTHROPIC_API_KEY` | - | Haiku key; falls back to `ANTHROPIC_API_KEY`, then `ANTHROPIC_AUTH_TOKEN` (Bearer). In an eval pod these are the agent's own credentials |
+| `GUIDANCE_ANTHROPIC_BASE_URL` | `ANTHROPIC_BASE_URL`, else `https://api.anthropic.com` | |
+| `GUIDANCE_ANTHROPIC_MODEL` | `claude-haiku-5-5` | |
+| `GUIDANCE_CLASSIFIER_TIMEOUT` | `GUIDANCE_JEV_TIMEOUT` | seconds, either classifier |
 | `TYPESAFE_API_KEY` | - | Jev API key; falls back to `~/.config/jev/api-key` |
 | `GUIDANCE_JEV_MODEL` | `jev-latest` | |
 | `GUIDANCE_JEV_URL` | `https://api.typesafe.ai/v1/systemone` | |
@@ -133,7 +138,7 @@ Keep the hook `timeout` above `GUIDANCE_JEV_TIMEOUT`.
 | `GUIDANCE_STATE_DIR` | `~/.claude/guidance/state` | per-session state + lock |
 | `GUIDANCE_LOG_DIR` | `~/.claude/guidance/logs` | per-session JSONL log |
 | `GUIDANCE_DISABLED` | - | `1` turns the router off |
-| `GUIDANCE_FAKE_PROBS` | - | JSON `{node: p}` instead of calling Jev (tests, dry runs) |
+| `GUIDANCE_FAKE_PROBS` | - | JSON `{node: p}` instead of calling the classifier (tests, dry runs) |
 
 The jbcontext guidance uses `instruction-mcp.md` once the session has made an
 `mcp__jbcontext*` call, `instruction.md` (CLI) otherwise.
@@ -142,7 +147,7 @@ The jbcontext guidance uses `instruction-mcp.md` once the session has made an
 
 `<GUIDANCE_LOG_DIR>/<session_id>.jsonl`, one event per line:
 `skip` (pre-filter: `path` or `established:<names>`), `classify` (probabilities,
-decision, confidence, latency), `classifier_error`, `allow` (with `low_confidence`
+decision, confidence, latency; for a live call also `classifier`, `model` and token `usage`), `classifier_error`, `allow` (with `low_confidence`
 when below the threshold),
 `deny`, `noncompliant`, `episode_end`, `explorer_done`, `prompt_reset`
 (with per-task counters: classifications, classifier_errors, denies, noncompliant).
@@ -153,7 +158,8 @@ when below the threshold),
 python3 hooks/guidance/test_guidance_hook.py
 ```
 
-The tests use a fake classifier and an isolated `HOME`; they never call Jev.
+The tests use a fake classifier, an isolated `HOME`, empty keys and unroutable URLs; they never call
+Haiku or Jev.
 
 ### Parity with the CLI port
 

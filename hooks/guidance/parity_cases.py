@@ -230,7 +230,8 @@ def run_flow(flow):
         transcript = root / "t.jsonl"
         transcript.write_text("\n".join(json.dumps(r) for r in flow.get("transcript", DEFAULT_TRANSCRIPT)) + "\n")
         env = {**os.environ, "HOME": str(root), "GUIDANCE_STATE_DIR": str(root / "state"),
-               "GUIDANCE_LOG_DIR": str(root / "logs"), "TYPESAFE_API_KEY": "",
+               "GUIDANCE_LOG_DIR": str(root / "logs"), "TYPESAFE_API_KEY": "", "ANTHROPIC_API_KEY": "", "ANTHROPIC_AUTH_TOKEN": "",
+                    "GUIDANCE_ANTHROPIC_API_KEY": "", "GUIDANCE_ANTHROPIC_BASE_URL": "http://127.0.0.1:9/never",
                "GUIDANCE_JEV_URL": "http://127.0.0.1:9/never", **flow.get("env", {})}
         for name in ("GUIDANCE_FAKE_PROBS",) + (() if "GUIDANCE_DISABLED" in flow.get("env", {}) else ("GUIDANCE_DISABLED",)):
             env.pop(name, None)

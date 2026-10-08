@@ -38,6 +38,11 @@ LOG_DIR = Path(os.environ.get("GUIDANCE_LOG_DIR") or HOME / ".claude" / "guidanc
 JEV_URL = os.environ.get("GUIDANCE_JEV_URL", "https://api.typesafe.ai/v1/systemone")
 JEV_MODEL = os.environ.get("GUIDANCE_JEV_MODEL", "jev-latest")
 JEV_TIMEOUT = float(os.environ.get("GUIDANCE_JEV_TIMEOUT", "10"))
+CLASSIFIER = os.environ.get("GUIDANCE_CLASSIFIER", "haiku").strip().lower()  # haiku | jev
+CLASSIFIER_TIMEOUT = float(os.environ.get("GUIDANCE_CLASSIFIER_TIMEOUT") or JEV_TIMEOUT)
+ANTHROPIC_MODEL = os.environ.get("GUIDANCE_ANTHROPIC_MODEL", "claude-haiku-5-5")
+ANTHROPIC_BASE_URL = (os.environ.get("GUIDANCE_ANTHROPIC_BASE_URL") or os.environ.get("ANTHROPIC_BASE_URL")
+                      or "https://api.anthropic.com").rstrip("/")
 MAX_EXPLORER_RUNS = int(os.environ.get("GUIDANCE_MAX_EXPLORER_RUNS", "1"))
 RECENT_STEPS = int(os.environ.get("GUIDANCE_RECENT_STEPS", "10"))
 DENY_MIN_PROB = float(os.environ.get("GUIDANCE_DENY_MIN_PROB", "0.75"))
@@ -512,11 +517,88 @@ def jev_key():
     return path.read_text(encoding="utf-8").strip() if path.exists() else ""
 
 
+CLASSIFIER_INSTRUCTIONS = (
+    "The state shows a coding agent's recent steps and reasoning (and the user's request "
+    "when it is recent). The agent is about to search the codebase for something; its "
+    "next tool call is deliberately not shown. From its reasoning and what the session "
+    "already established, judge what it intends to find next, and which search approach "
+    "fits that intent. In the option descriptions, the pending call means this next search.")
+
+
 def classify(state_payload):
-    """Return {node: probability}. Raises on any failure (caller fails open)."""
+    """(probs, meta): {node: probability}, and what to log about the call ({} for a fake classifier).
+
+    Raises on any failure (caller fails open).
+    """
     fake = os.environ.get("GUIDANCE_FAKE_PROBS")
     if fake:
-        return {k: float(v) for k, v in json.loads(fake).items()}
+        return {k: float(v) for k, v in json.loads(fake).items()}, {}
+    if CLASSIFIER == "jev":
+        return classify_jev(state_payload)
+    return classify_haiku(state_payload)
+
+
+def classify_haiku(state_payload):
+    """Claude Haiku over the Messages API: one forced `route` tool call returning a probability per node.
+
+    The call is made by the hook, not the agent, so it is not part of the agent's own usage; its
+    token usage is returned for the log so the classifier cost can be reported separately.
+    """
+    key = os.environ.get("GUIDANCE_ANTHROPIC_API_KEY", "").strip() or os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    token = os.environ.get("ANTHROPIC_AUTH_TOKEN", "").strip()
+    if key:
+        auth = {"x-api-key": key}
+    elif token:
+        auth = {"Authorization": f"Bearer {token}"}
+    else:
+        raise RuntimeError("no Anthropic credentials (GUIDANCE_ANTHROPIC_API_KEY, ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN)")
+    options = "\n\n".join(f'<option name="{node}">\n{text}\n</option>' for node, text in node_descriptions().items())
+    payload = {
+        "model": ANTHROPIC_MODEL,
+        "max_tokens": 1024,
+        "output_config": {"effort": "low"},
+        "system": (f"{CLASSIFIER_INSTRUCTIONS}\n\nThe search approaches:\n\n{options}\n\n"
+                   "Call the route tool once, with a probability between 0 and 1 for every approach; "
+                   "the probabilities should sum to 1."),
+        "tools": [{
+            "name": "route",
+            "description": "Report how likely each search approach fits the agent's next search.",
+            "strict": True,
+            "input_schema": {
+                "type": "object",
+                "properties": {node: {"type": "number"} for node in NODES},
+                "required": list(NODES),
+                "additionalProperties": False,
+            },
+        }],
+        "tool_choice": {"type": "tool", "name": "route"},
+        "messages": [{"role": "user", "content": json.dumps(state_payload, ensure_ascii=False)}],
+    }
+    request = urllib.request.Request(
+        f"{ANTHROPIC_BASE_URL}/v1/messages", data=json.dumps(payload).encode("utf-8"), method="POST",
+        headers={**auth, "anthropic-version": "2023-06-01", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=CLASSIFIER_TIMEOUT) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"Anthropic HTTP {error.code}") from None
+    if result.get("stop_reason") == "refusal":
+        raise RuntimeError("classifier request refused")
+    call = next((c for c in result.get("content", []) if c.get("type") == "tool_use" and c.get("name") == "route"), None)
+    if call is None:
+        raise RuntimeError(f"no route call (stop_reason {result.get('stop_reason')})")
+    raw = {node: max(0.0, float(call["input"].get(node, 0.0))) for node in NODES}
+    total = sum(raw.values())
+    if total <= 0:
+        raise RuntimeError("route call returned no probability mass")
+    usage = result.get("usage") or {}
+    meta = {"classifier": "haiku", "model": result.get("model", ANTHROPIC_MODEL),
+            "usage": {k: usage[k] for k in ("input_tokens", "output_tokens") if k in usage}}
+    return {node: raw[node] / total for node in NODES}, meta
+
+
+def classify_jev(state_payload):
+    """Jev `choice` question over the node descriptions (the original classifier)."""
     key = jev_key()
     if not key:
         raise RuntimeError("no Jev API key (TYPESAFE_API_KEY or ~/.config/jev/api-key)")
@@ -526,12 +608,7 @@ def classify(state_payload):
         "questions": {
             "route": {
                 "type": "choice",
-                "instructions": (
-                    "The state shows a coding agent's recent steps and reasoning (and the user's request "
-                    "when it is recent). The agent is about to search the codebase for something; its "
-                    "next tool call is deliberately not shown. From its reasoning and what the session "
-                    "already established, judge what it intends to find next, and which search approach "
-                    "fits that intent. In the option descriptions, the pending call means this next search."),
+                "instructions": CLASSIFIER_INSTRUCTIONS,
                 "criteria": node_descriptions(),
             }
         },
@@ -540,12 +617,12 @@ def classify(state_payload):
         JEV_URL, data=json.dumps(payload).encode("utf-8"), method="POST",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=JEV_TIMEOUT) as response:
+        with urllib.request.urlopen(request, timeout=CLASSIFIER_TIMEOUT) as response:
             result = json.load(response)
     except urllib.error.HTTPError as error:
         raise RuntimeError(f"Jev HTTP {error.code}") from None
     probs = result["answers"]["route"]["probabilities"]
-    return {node: float(probs.get(node, 0.0)) for node in NODES}
+    return {node: float(probs.get(node, 0.0)) for node in NODES}, {"classifier": "jev"}
 
 
 def pick_winner(probs, explorer_runs):
@@ -638,14 +715,14 @@ def handle_pre(data):
             task, recent = read_transcript(data.get("transcript_path", ""))
             started = time.time()
             try:
-                probs = classify(classifier_state(task, recent, tool))
+                probs, meta = classify(classifier_state(task, recent, tool))
                 episode["probs"] = probs
                 episode["decision"], episode["confidence"] = pick_winner(probs, state["explorer_runs"])
                 state["counters"]["classifications"] += 1
                 log_event(session_id, {"event": "classify", "episode": episode["id"], "tool": tool,
                                        "pending_node": pending, "probs": probs, "decision": episode["decision"],
                                        "confidence": round(episode["confidence"], 3),
-                                       "latency_ms": int((time.time() - started) * 1000)})
+                                       "latency_ms": int((time.time() - started) * 1000), **meta})
             except Exception as error:  # fail open for the whole episode
                 episode["decision"] = "none"
                 state["counters"]["classifier_errors"] += 1

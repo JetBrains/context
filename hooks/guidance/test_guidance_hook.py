@@ -105,7 +105,8 @@ class FlowTest(unittest.TestCase):
         # HOME points at the temp dir so the real ~/.config/jev/api-key is never read, and the
         # Jev URL is unroutable: tests can never make a live classifier call.
         self.env = {**os.environ, "HOME": str(root), "GUIDANCE_STATE_DIR": str(root / "state"),
-                    "GUIDANCE_LOG_DIR": str(root / "logs"), "TYPESAFE_API_KEY": "",
+                    "GUIDANCE_LOG_DIR": str(root / "logs"), "TYPESAFE_API_KEY": "", "ANTHROPIC_API_KEY": "", "ANTHROPIC_AUTH_TOKEN": "",
+                    "GUIDANCE_ANTHROPIC_API_KEY": "", "GUIDANCE_ANTHROPIC_BASE_URL": "http://127.0.0.1:9/never",
                     "GUIDANCE_JEV_URL": "http://127.0.0.1:9/never"}
         for name in ("GUIDANCE_DISABLED", "GUIDANCE_FAKE_PROBS"):
             self.env.pop(name, None)
