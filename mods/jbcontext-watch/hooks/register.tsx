@@ -1,26 +1,35 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { JbView } from '../types'
+import type { JbSearch, JbSession, JbTurn, JbView } from '../types'
 import {
   ago,
   claudeProjectDir,
   describeIndex,
+  describeSession,
+  describeTurn,
+  explorationKind,
   explorePrice,
   firstLine,
+  formatDuration,
   formatTokens,
   formatUsd,
+  jbcontextShare,
+  jbcontextUsage,
   mergeDays,
   normalizeRepo,
+  parseSessionPhases,
   parseSessionStatus,
   parseStatsDay,
   parseStatus,
   repoName,
   savedTokens,
   scopeToRepo,
+  searchLabel,
+  statusLine,
   touchesJbcontext,
 } from './model'
-import type { DayEvents, RepoEvents, SessionStatus } from './model'
+import type { DayEvents, JbcontextUsage, RepoEvents, SessionStatus } from './model'
 
 const PANE = 'jbcontext'
 const STATS_POLL_MS = 5_000
@@ -30,9 +39,23 @@ const KEPT = 200
 const MAX_SESSIONS_SCANNED = 40
 const PRICE_KEY = 'explorePrice'
 const PRICE_RETRY_MS = 60 * 60 * 1000
+// Local exploration calls in a row, with the repository indexed, that turn the band's
+// nudge on; and how long the spinner says how a jbcontext call went.
+const NUDGE_STREAK = 6
+const RESULT_SHOWN_MS = 4_000
 
 const view = atom({ plugin: 'jbcontext-watch', key: 'view' } as const, null as JbView | null)
+const turnState = atom({ plugin: 'jbcontext-watch', key: 'turn' } as const, null as JbTurn | null)
 const isBandHidden = atom({ plugin: 'jbcontext-watch', key: 'isBandHidden' } as const, false)
+
+const EMPTY_TURN: JbTurn = {
+  explorations: 0,
+  jbcontextCalls: 0,
+  jbcontextHits: 0,
+  streak: 0,
+  searching: null,
+  result: null,
+}
 
 const EMPTY: JbView = {
   searches: [],
@@ -44,25 +67,49 @@ const EMPTY: JbView = {
   repoKey: null,
   indexingSince: null,
   savings: null,
+  session: null,
   updatedAt: 0,
 }
 
 let appHome = ''
 let claudeHome = ''
+let tempHome = ''
 let cwd = ''
+let isInteractive = false
 let statsStamp = ''
 // Every repository's searches and errors from the stats files, scoped to this one
 // whenever it or the repository changes.
 let statsEvents: DayEvents = { searches: [], errors: [] }
-let isStatsRunning = false
+let statsRun: Promise<void> | null = null
+let isStatsQueued = false
+let shownStatus: string | undefined
+const creditedSearches = new Set<string>()
 let isStatusRunning = false
 let isSavingsRunning = false
 let isPriceRunning = false
 const sessionCache = new Map<string, { mtimeMs: number; status: SessionStatus | null }>()
+const usageCache = new Map<string, { stamp: string; usage: JbcontextUsage }>()
+let measuring: Promise<JbSession | null> | null = null
+// The exploring tokens the last line under an answer showed, so a turn that explored
+// nothing adds no line.
+let shownTokens: { sessionId: string; tokens: number } | null = null
 
-function patch($: EngineInterface, fn: (current: JbView) => Partial<JbView>) {
-  return update($, view, current => {
+async function patch($: EngineInterface, fn: (current: JbView) => Partial<JbView>) {
+  const written = await update($, view, current => {
     const base = current ?? EMPTY
+    return { ...base, ...fn(base) }
+  })
+  const line = written ? statusLine(written) : undefined
+  if (line !== shownStatus) {
+    shownStatus = line
+    $.ui.status(line)
+  }
+  return written
+}
+
+function patchTurn($: EngineInterface, fn: (current: JbTurn) => Partial<JbTurn>) {
+  return update($, turnState, current => {
+    const base = current ?? EMPTY_TURN
     return { ...base, ...fn(base) }
   })
 }
@@ -81,34 +128,48 @@ async function jbcontextBinary($: EngineInterface): Promise<string> {
   return (await $.fs.exists(bundled)) ? bundled : 'jbcontext'
 }
 
-async function refreshStats($: EngineInterface) {
-  if (isStatsRunning) return
-  isStatsRunning = true
-  try {
-    const dir = `${appHome}/stats`
-    let entries
-    try {
-      entries = await $.fs.list(dir)
-    } catch {
-      return
-    }
-    const days = entries
-      .filter(entry => entry.kind === 'file' && /^\d{4}-\d{2}-\d{2}\.json$/.test(entry.name))
-      .sort((a, b) => b.name.localeCompare(a.name))
-      .slice(0, STATS_DAYS)
-    const stamp = days.map(day => `${day.name}:${day.mtimeMs}:${day.size}`).join('|')
-    if (stamp === statsStamp) return
-    statsStamp = stamp
-
-    const parsed = await Promise.all(
-      days.map(async day => parseStatsDay(await $.fs.read(`${dir}/${day.name}`).catch(() => ''))),
-    )
-    statsEvents = mergeDays(parsed)
-    const now = await $.clock.now()
-    await patch($, current => ({ ...inRepo(current.repoKey), updatedAt: now }))
-  } finally {
-    isStatsRunning = false
+// A call made while a read runs gets another read after it, so whoever awaits this sees
+// the files as they stood when it asked.
+function refreshStats($: EngineInterface): Promise<void> {
+  if (statsRun !== null) {
+    isStatsQueued = true
+    return statsRun
   }
+  statsRun = (async () => {
+    try {
+      do {
+        isStatsQueued = false
+        await readStats($)
+      } while (isStatsQueued)
+    } finally {
+      statsRun = null
+    }
+  })()
+  return statsRun
+}
+
+async function readStats($: EngineInterface) {
+  const dir = `${appHome}/stats`
+  let entries
+  try {
+    entries = await $.fs.list(dir)
+  } catch {
+    return
+  }
+  const days = entries
+    .filter(entry => entry.kind === 'file' && /^\d{4}-\d{2}-\d{2}\.json$/.test(entry.name))
+    .sort((a, b) => b.name.localeCompare(a.name))
+    .slice(0, STATS_DAYS)
+  const stamp = days.map(day => `${day.name}:${day.mtimeMs}:${day.size}`).join('|')
+  if (stamp === statsStamp) return
+  statsStamp = stamp
+
+  const parsed = await Promise.all(
+    days.map(async day => parseStatsDay(await $.fs.read(`${dir}/${day.name}`).catch(() => ''))),
+  )
+  statsEvents = mergeDays(parsed)
+  const now = await $.clock.now()
+  await patch($, current => ({ ...inRepo(current.repoKey), updatedAt: now }))
 }
 
 async function refreshStatus($: EngineInterface) {
@@ -261,19 +322,115 @@ async function refreshSavingsIfShown($: EngineInterface) {
   if (await isPaneOpen($)) await refreshSavings($)
 }
 
+async function transcriptUsage($: EngineInterface, path: string, size: number, mtimeMs: number) {
+  const stamp = `${size}:${mtimeMs}`
+  const cached = usageCache.get(path)
+  if (cached?.stamp === stamp) return cached.usage
+  const usage = jbcontextUsage(await $.fs.read(path).catch(() => ''))
+  usageCache.set(path, { stamp, usage })
+  return usage
+}
+
+// `jbcontext analyze` reads a projects folder, so the session's transcript and each of
+// its subagents' are linked into one of their own, the subagents as sessions beside it:
+// the CLI counts a subagent's tokens only in a transcript of its own.
+async function measureSession($: EngineInterface): Promise<JbSession | null> {
+  if (claudeHome === '') return null
+  const sessionId = await $.session.id()
+  const projectDir = `${claudeHome}/projects/${claudeProjectDir(cwd)}`
+  const main = `${projectDir}/${sessionId}.jsonl`
+  const mainStat = await $.fs.stat(main).catch(() => null)
+  if (mainStat?.kind !== 'file') return null
+  const subagentDir = `${projectDir}/${sessionId}/subagents`
+  const transcripts = [
+    { path: main, size: mainStat.size, mtimeMs: mainStat.mtimeMs },
+    ...(await $.fs.list(subagentDir).catch(() => []))
+      .filter(entry => entry.kind === 'file' && entry.name.endsWith('.jsonl'))
+      .map(entry => ({ path: `${subagentDir}/${entry.name}`, size: entry.size, mtimeMs: entry.mtimeMs })),
+  ]
+
+  const linkRoot = `${tempHome}/jbcontext-watch/${sessionId}`
+  const links = `${linkRoot}/session`
+  const made = await $.process.run(['mkdir', '-p', links], { timeoutMs: 5_000 })
+  if (made.exitCode !== 0) return null
+  const linked = await $.process.run(['ln', '-sf', ...transcripts.map(one => one.path), `${links}/`], {
+    timeoutMs: 5_000,
+  })
+  if (linked.exitCode !== 0) return null
+  const analyze = await $.process.run(
+    [await jbcontextBinary($), 'analyze', '--projects-dir', linkRoot, '--agent', 'claude', '--min-tool-calls', '0', '--json-output'],
+    { cwd, timeoutMs: 20_000 },
+  )
+  const phases = analyze.exitCode === 0 ? parseSessionPhases(analyze.stdout) : null
+  if (phases === null) return null
+
+  const usages = await Promise.all(transcripts.map(one => transcriptUsage($, one.path, one.size, one.mtimeMs)))
+  const session: JbSession = {
+    sessionId,
+    ...phases,
+    jbcontextCalls: usages.reduce((sum, usage) => sum + usage.calls, 0),
+    jbcontextTokens: usages.reduce((sum, usage) => sum + usage.tokens, 0),
+  }
+  await patch($, () => ({ session }))
+  return session
+}
+
+function measureSessionOnce($: EngineInterface): Promise<JbSession | null> {
+  measuring ??= measureSession($)
+    .catch(() => null)
+    .finally(() => {
+      measuring = null
+    })
+  return measuring
+}
+
+function searchKey(search: JbSearch): string {
+  return `${search.at}|${search.query}`
+}
+
+// How a jbcontext call went, from the search event the CLI or MCP server writes to the
+// stats files: read again a second later when it is not there yet.
+async function finishSearch($: EngineInterface, startedAt: number, isError: boolean, isRetry = false) {
+  await refreshStats($)
+  // Any repository's: an org-wide search names another. One credited to a call is not
+  // credited again to a call beside it.
+  const search = statsEvents.searches.find(one => one.at >= startedAt - 2_000 && !creditedSearches.has(searchKey(one)))
+  if (search !== undefined) creditedSearches.add(searchKey(search))
+  if (search === undefined && !isError && !isRetry) {
+    $.clock.after(1_000, () => void finishSearch($, startedAt, isError, true))
+    return
+  }
+  const now = await $.clock.now()
+  const seconds = (((search?.durationMs ?? null) ?? now - startedAt) / 1000).toFixed(1)
+  const text =
+    isError || search?.success === false
+      ? 'jbcontext search failed'
+      : search?.results != null
+        ? `jbcontext: ${search.results} hit${search.results === 1 ? '' : 's'} in ${seconds}s`
+        : `jbcontext: done in ${seconds}s`
+  await patchTurn($, turn => ({
+    jbcontextHits: turn.jbcontextHits + (search?.results ?? 0),
+    result: { text, until: now + RESULT_SHOWN_MS },
+  }))
+  // Redraws the spinner once the outcome is due to go.
+  $.clock.after(RESULT_SHOWN_MS + 100, () => $.ui.invalidate('ui.render'))
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     cwd = e.cwd
+    isInteractive = e.isInteractive
     const home = (await $.env.get('HOME')) ?? ''
     const explicit = await $.env.get('JBCONTEXT_HOME')
     appHome = explicit && explicit.length > 0 ? explicit : `${home}/.jbcontext`
     const claudeConfig = await $.env.get('CLAUDE_CONFIG_DIR')
     claudeHome = claudeConfig && claudeConfig.length > 0 ? claudeConfig : `${home}/.claude`
+    tempHome = ((await $.env.get('TMPDIR')) || '/tmp').replace(/\/+$/, '')
 
     await $.command.register({
       name: 'jbcontext',
-      description: 'Show jbcontext searches, errors, index status and today’s savings for this repo (run again or `/jbcontext close` to hide; `/jbcontext band` toggles the band)',
+      description: 'Show jbcontext searches, errors, index status, this session’s exploration and today’s savings for this repo (run again or `/jbcontext close` to hide; `/jbcontext band` toggles the band)',
       argumentHint: '[close|band]',
     })
 
@@ -304,71 +461,119 @@ export const register: Register = on => {
     }
     void refreshStatus($)
     void refreshSavings($)
+    void measureSessionOnce($)
     await $.ui.open({ id: PANE, title: 'jbcontext' })
     return { text: 'jbcontext pane opened.' }
   })
 
-  on('tool.call', async ($, e, next) => {
-    const isMcp = e.tool.startsWith('mcp__') && /jbcontext|embark/.test(e.tool)
-    const touch = e.tool === 'Bash' ? touchesJbcontext(e.command) : isMcp ? 'other' : null
-    if (touch === null) return next(e)
+  on('turn.start', async ($, e, next) => {
+    await update($, turnState, () => EMPTY_TURN)
+    return next(e)
+  })
 
-    if (touch === 'index') {
-      const now = await $.clock.now()
-      await patch($, () => ({ indexingSince: now }))
+  // Counts the turn's exploration as it runs, says in the spinner what jbcontext is
+  // searching for, and marks a `jbcontext index` run while it lasts.
+  on('tool.call', async ($, e, next) => {
+    const kind = explorationKind(e.tool, e)
+    const touch = e.tool === 'Bash' ? touchesJbcontext(e.command) : kind === 'jbcontext' ? 'other' : null
+    if (kind === null && touch === null) return next(e)
+
+    const startedAt = await $.clock.now()
+    const label = kind === 'jbcontext' ? searchLabel(e.tool, e) : null
+    if (kind !== null) {
+      await patchTurn($, turn => ({
+        explorations: turn.explorations + 1,
+        jbcontextCalls: turn.jbcontextCalls + (kind === 'jbcontext' ? 1 : 0),
+        streak: kind === 'jbcontext' ? 0 : turn.streak + 1,
+        searching: label ?? turn.searching,
+      }))
     }
+    if (touch === 'index') await patch($, () => ({ indexingSince: startedAt }))
+    let isError = true
     try {
-      return await next(e)
+      const result = await next(e)
+      isError = 'deny' in result || result.isError === true
+      return result
     } finally {
+      if (label !== null) {
+        await patchTurn($, turn => ({ searching: turn.searching === label ? null : turn.searching }))
+        void finishSearch($, startedAt, isError)
+      }
       if (touch === 'index') await patch($, () => ({ indexingSince: null }))
-      void refreshStats($)
+      if (touch !== null && label === null) void refreshStats($)
       if (touch === 'index') void refreshStatus($)
     }
   })
 
+  // Beneath an answer whose turn explored, the session's exploration so far; once the
+  // session ends, the last of these lines stands as its summary.
   on('turn.complete', async ($, e, next) => {
     void refreshStats($)
+    const result = await next(e)
+    if (!isInteractive || e.agentId !== undefined || result.text !== e.answer) return result
+    const session = await measureSessionOnce($)
+    if (session === null || session.exploreTokens === 0) return result
+    if (shownTokens?.sessionId === session.sessionId && shownTokens.tokens === session.exploreTokens) return result
+    shownTokens = { sessionId: session.sessionId, tokens: session.exploreTokens }
+    return { ...result, text: describeSession(session) }
+  })
+
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') await patch($, () => ({ session: null }))
     return next(e)
   })
 
+  // While Claude works: the turn's exploration so far, a nudge when it greps on and on in
+  // an indexed repository, the index when it is not current, and a fresh error. Nothing
+  // when there is nothing of these to say.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || !e.props.isWorking || (await read($, isBandHidden))) return next(e)
     const current = await read($, view)
     if (current === null) return next(e)
+    const turn = (await read($, turnState)) ?? EMPTY_TURN
 
-    const { Box, Text } = $.ui.resolve(e)
     const now = await $.clock.now()
-    const index = describeIndex(current.index, now)
-    const search = current.searches[0]
     const error = current.errors[0]
     const isFreshError = error !== undefined && now - error.at < 60 * 60 * 1000
+    const isIndexing = current.indexingSince !== null
+    const state = current.index?.state
+    const isIndexShown =
+      !isIndexing &&
+      current.index !== null &&
+      state !== 'current' &&
+      !(current.index.state === 'unavailable' && current.index.reason === 'not a git repository')
+    const isNudge = (state === 'current' || state === 'stale') && turn.streak >= NUDGE_STREAK
+    if (!isIndexing && turn.explorations === 0 && !isIndexShown && !isFreshError) return next(e)
 
+    const { Box, Text } = $.ui.resolve(e)
+    const index = describeIndex(current.index, now)
     return (
       <Box
         flexDirection="column"
         width={e.props.bodyColumns}
         borderStyle="round"
-        borderColor="inactive"
+        borderColor={isNudge ? 'warning' : 'inactive'}
         paddingX={1}
       >
         <Text wrap="truncate-end">
           <Text color="claude" bold>jbcontext</Text>
           {'  '}
-          {current.indexingSince !== null ? (
-            <Text color="suggestion">indexing... {ago(current.indexingSince, now).replace(' ago', '')}</Text>
+          {isIndexing ? (
+            <Text color="suggestion">indexing... {ago(current.indexingSince!, now).replace(' ago', '')}</Text>
+          ) : turn.explorations > 0 ? (
+            describeTurn(turn)
           ) : (
-            <Text color={index.color}>{index.text}</Text>
+            ''
           )}
         </Text>
-        {search && (
-          <Text wrap="truncate-end">
-            <Text dimColor>search {ago(search.at, now).padEnd(8)}</Text>
-            {search.query}
-            <Text dimColor>
-              {'  '}
-              {search.results ?? '?'} hits
-              {search.durationMs !== null ? ` in ${(search.durationMs / 1000).toFixed(1)}s` : ''}
-            </Text>
+        {isNudge && (
+          <Text color="warning" wrap="truncate-end">
+            {turn.streak} grep/read calls in a row without jbcontext; this repository is indexed
+          </Text>
+        )}
+        {isIndexShown && (
+          <Text color={index.color} wrap="truncate-end">
+            {index.text}
           </Text>
         )}
         {isFreshError && (
@@ -379,6 +584,16 @@ export const register: Register = on => {
         )}
       </Box>
     )
+  })
+
+  // Says what jbcontext is searching for while the call runs, then how it went.
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    const turn = await read($, turnState)
+    if (turn === null) return next(e)
+    if (turn.searching !== null) return next({ ...e, props: { ...e.props, message: turn.searching } })
+    const now = await $.clock.now()
+    if (turn.result === null || turn.result.until <= now) return next(e)
+    return next({ ...e, props: { ...e.props, message: turn.result.text, suffix: '' } })
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -393,6 +608,8 @@ export const register: Register = on => {
     const searchRows = Math.max(3, Math.ceil(rows * 0.6))
     const errorRows = Math.max(2, rows - searchRows)
     const savings = current.savings
+    // `?? null`: a view written before this field existed outlives a reload.
+    const session = current.session ?? null
     const price = savings?.usdPerToken ?? null
 
     return (
@@ -403,6 +620,31 @@ export const register: Register = on => {
           <Text color="suggestion">indexing in this session since {ago(current.indexingSince, now)}</Text>
         )}
         <Text color={index.color} wrap="wrap">{index.text}</Text>
+
+        <Text> </Text>
+        <Text bold>This session</Text>
+        {session === null && <Text dimColor>Measured when Claude finishes a turn.</Text>}
+        {session !== null && (
+          <Text wrap="wrap">
+            Explored {formatTokens(session.exploreTokens)} tokens in {formatDuration(session.exploreMs)}, ≈
+            {formatUsd(session.exploreUsd)}
+            {session.totalUsd > 0 && (
+              <Text dimColor>
+                {' '}
+                ({Math.round((session.exploreUsd / session.totalUsd) * 100)}% of the session’s {formatUsd(session.totalUsd)})
+              </Text>
+            )}
+          </Text>
+        )}
+        {session !== null && session.jbcontextCalls === 0 && (
+          <Text dimColor>jbcontext not used in this session.</Text>
+        )}
+        {session !== null && session.jbcontextCalls > 0 && (
+          <Text color="claude" wrap="wrap">
+            jbcontext: {session.jbcontextCalls} call{session.jbcontextCalls === 1 ? '' : 's'},{' '}
+            {formatTokens(session.jbcontextTokens)} tokens, {jbcontextShare(session)}% of exploring
+          </Text>
+        )}
 
         <Text> </Text>
         <Text bold>Today in {repoLabel}</Text>

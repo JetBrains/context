@@ -1,4 +1,4 @@
-import type { JbError, JbIndex, JbSearch } from '../types'
+import type { JbError, JbIndex, JbSearch, JbSession, JbTurn, JbView } from '../types'
 
 // The CLI's local stats format: one file per day,
 // `{ date, events: [...] }`, each event tagged by `type`.
@@ -226,6 +226,198 @@ export function explorePrice(analyzeJson: string): number | null {
   } catch {
     return null
   }
+}
+
+export type SessionPhases = Pick<JbSession, 'exploreTokens' | 'exploreMs' | 'exploreUsd' | 'totalUsd'>
+
+// `jbcontext analyze --json-output` over a projects folder holding one session's transcripts.
+export function parseSessionPhases(analyzeJson: string): SessionPhases | null {
+  try {
+    const phases: { phase?: string; totalTokensBilled?: number; totalDurationMs?: number; totalCostUsd?: number }[] =
+      JSON.parse(analyzeJson)?.phaseBreakdown ?? []
+    const exploring = phases.find(phase => phase.phase === 'Exploring')
+    if (!exploring) return null
+    return {
+      exploreTokens: exploring.totalTokensBilled ?? 0,
+      exploreMs: exploring.totalDurationMs ?? 0,
+      exploreUsd: exploring.totalCostUsd ?? 0,
+      totalUsd: phases.reduce((sum, phase) => sum + (phase.totalCostUsd ?? 0), 0),
+    }
+  } catch {
+    return null
+  }
+}
+
+export type JbcontextUsage = { calls: number; tokens: number }
+
+// A jbcontext MCP tool, or a shell command that runs `jbcontext search` or `jbcontext
+// repos` (first in the command or after `;`, `&&`, `|`, `(`), not one that only names
+// it in a quoted argument (`grep 'jbcontext search'`).
+export function isJbcontextCall(name: string, input: unknown): boolean {
+  if (name.startsWith('mcp__')) return /jbcontext|embark/i.test(name)
+  if (name !== 'Bash') return false
+  const command = (input as { command?: unknown } | null)?.command
+  if (typeof command !== 'string') return false
+  return /(?:^|[;&|(\n])\s*(?:\S*\/)?jbcontext\s+(?:--?\S+\s+)*(?:search|repos)\b/.test(unquote(command))
+}
+
+function unquote(command: string): string {
+  return command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''")
+}
+
+const LOCAL_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead', 'LSP'])
+const READ_ONLY_COMMANDS = new Set(['grep', 'egrep', 'fgrep', 'rg', 'ag', 'ack', 'find', 'fd', 'ls', 'tree', 'cat', 'head', 'tail', 'less', 'wc'])
+const READ_ONLY_GIT = new Set(['grep', 'log', 'show', 'blame', 'ls-files', 'ls-tree'])
+
+// What a tool call is to exploration: a jbcontext call, a local one (a read, grep, glob,
+// listing, or a shell command led by one of those), or none.
+export function explorationKind(tool: string, args: unknown): 'jbcontext' | 'local' | null {
+  if (isJbcontextCall(tool, args)) return 'jbcontext'
+  if (LOCAL_TOOLS.has(tool)) return 'local'
+  if (tool !== 'Bash') return null
+  const command = (args as { command?: unknown } | null)?.command
+  if (typeof command !== 'string') return null
+  const segment = unquote(command)
+    .split(/&&|\|\||;|\n/)
+    .map(part => part.trim().split(/\s+/).filter(word => !/^[A-Za-z_]\w*=/.test(word)))
+    .find(words => words.length > 0 && words[0] !== 'cd')
+  if (!segment) return null
+  const name = segment[0]!.split('/').pop()!
+  if (READ_ONLY_COMMANDS.has(name)) return 'local'
+  if (name === 'sed' && segment.includes('-n')) return 'local'
+  if (name === 'git') {
+    const sub = segment[1] === '-C' ? segment[3] : segment[1]
+    return sub !== undefined && READ_ONLY_GIT.has(sub) ? 'local' : null
+  }
+  return null
+}
+
+// What the spinner says while a jbcontext call runs: `Searching jbcontext: "query"`.
+export function searchLabel(tool: string, args: unknown): string {
+  const record = (args ?? {}) as Record<string, unknown>
+  const isRepos = tool === 'Bash' ? /\bjbcontext\s+(?:--?\S+\s+)*repos\b/.test(unquote(String(record.command ?? ''))) : /repositor/i.test(tool)
+  const query = tool === 'Bash' ? shellQuery(String(record.command ?? '')) : firstString(record.text, record.query, record.q)
+  const verb = isRepos ? 'Finding repositories in jbcontext' : 'Searching jbcontext'
+  return query ? `${verb}: "${query.length > 60 ? `${query.slice(0, 59)}…` : query}"` : verb
+}
+
+function firstString(...values: unknown[]): string | null {
+  const found = values.find(value => typeof value === 'string' && value.trim().length > 0)
+  return typeof found === 'string' ? found.trim() : null
+}
+
+// The query of `jbcontext search|repos ...`, among the words up to the next shell
+// operator: the last that holds a space (a semantic query; an URL or a path holds
+// none), else the first that is neither a flag nor a flag's value (`--limit 10`).
+function shellQuery(command: string): string | null {
+  const head = /\bjbcontext\s+(?:--?\S+\s+)*(?:search|repos)\b/.exec(command)
+  if (!head) return null
+  const words: { text: string; isFlag: boolean }[] = []
+  const token = /"((?:[^"\\]|\\.)*)"|'([^']*)'|(\|\||&&|\d*[<>]|[|;&\n])|([^\s|;&<>]+)/g
+  token.lastIndex = head.index + head[0].length
+  for (let match = token.exec(command); match; match = token.exec(command)) {
+    if (match[3] !== undefined) break
+    const text = match[1] ?? match[2] ?? match[4] ?? ''
+    words.push({ text, isFlag: match[4] !== undefined && text.startsWith('-') })
+  }
+  const spaced = [...words].reverse().find(word => !word.isFlag && /\s/.test(word.text))
+  const positional = words.find(
+    (word, at) => !word.isFlag && !(at > 0 && words[at - 1]!.isFlag && !words[at - 1]!.text.includes('=')),
+  )
+  return (spaced ?? positional ?? words.find(word => !word.isFlag))?.text ?? null
+}
+
+export function describeTurn(turn: JbTurn): string {
+  const calls = `${turn.explorations} exploration call${turn.explorations === 1 ? '' : 's'}`
+  const jbcontext =
+    turn.jbcontextCalls === 0
+      ? 'none via jbcontext'
+      : `${turn.jbcontextCalls} via jbcontext (${turn.jbcontextHits} hit${turn.jbcontextHits === 1 ? '' : 's'})`
+  return `this turn: ${calls} · ${jbcontext}`
+}
+
+// The status line under the prompt: the index of this branch, and once a turn has been
+// measured, how much of the session's exploring went through jbcontext.
+export function statusLine(view: JbView): string | undefined {
+  const index = view.index
+  let head: string
+  if (view.indexingSince !== null) head = 'jbcontext · indexing…'
+  else if (index === null) return undefined
+  else if (index.state === 'current') head = `jbcontext ✓ ${index.branch} indexed`
+  else if (index.state === 'stale') head = `jbcontext ⚠ ${index.branch} HEAD not indexed`
+  else if (index.state === 'other') head = `jbcontext ⚠ ${index.branch} not indexed`
+  else if (index.state === 'none') head = 'jbcontext ✗ repository not indexed'
+  else if (index.reason === 'not a git repository') return undefined
+  else head = `jbcontext ✗ ${index.reason.length > 60 ? `${index.reason.slice(0, 59)}…` : index.reason}`
+
+  const session = view.session ?? null
+  if (session === null || session.exploreTokens === 0) return head
+  return session.jbcontextCalls === 0
+    ? `${head} · session: jbcontext not used`
+    : `${head} · session: ${jbcontextShare(session)}% of exploring via jbcontext`
+}
+
+// The tokens billed for the responses that called jbcontext, the way `jbcontext analyze`
+// bills a response to the phase of its tool calls: input, cache writes, cache reads and
+// output; a response that also called other tools is split evenly among its calls.
+// A response spans several transcript lines, one per content block, under one id.
+export function jbcontextUsage(transcript: string): JbcontextUsage {
+  const responses = new Map<string, { billed: number; tools: number; jbcontext: number }>()
+  for (const line of transcript.split('\n')) {
+    if (!line.includes('"assistant"')) continue
+    let entry
+    try {
+      entry = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const message = entry?.type === 'assistant' ? entry.message : undefined
+    if (typeof message?.id !== 'string') continue
+    const response = responses.get(message.id) ?? { billed: 0, tools: 0, jbcontext: 0 }
+    const usage = message.usage ?? {}
+    response.billed =
+      (usage.input_tokens ?? 0) +
+      (usage.cache_creation_input_tokens ?? 0) +
+      (usage.cache_read_input_tokens ?? 0) +
+      (usage.output_tokens ?? 0)
+    for (const block of Array.isArray(message.content) ? message.content : []) {
+      if (block?.type !== 'tool_use') continue
+      response.tools++
+      if (isJbcontextCall(String(block.name ?? ''), block.input)) response.jbcontext++
+    }
+    responses.set(message.id, response)
+  }
+
+  let calls = 0
+  let tokens = 0
+  for (const response of responses.values()) {
+    if (response.jbcontext === 0) continue
+    calls += response.jbcontext
+    tokens += (response.billed * response.jbcontext) / response.tools
+  }
+  return { calls, tokens: Math.round(tokens) }
+}
+
+export function jbcontextShare(session: JbSession): number {
+  if (session.exploreTokens <= 0) return 0
+  return Math.min(100, Math.round((session.jbcontextTokens / session.exploreTokens) * 100))
+}
+
+export function describeSession(session: JbSession): string {
+  const costShare = session.totalUsd > 0 ? ` (${Math.round((session.exploreUsd / session.totalUsd) * 100)}% of ${formatUsd(session.totalUsd)})` : ''
+  const jbcontext =
+    session.jbcontextCalls === 0
+      ? 'jbcontext not used'
+      : `jbcontext ${session.jbcontextCalls} call${session.jbcontextCalls === 1 ? '' : 's'}, ${jbcontextShare(session)}% of exploring tokens`
+  return `jbcontext · this session explored ${formatTokens(session.exploreTokens)} tokens in ${formatDuration(session.exploreMs)}, ≈${formatUsd(session.exploreUsd)}${costShare} · ${jbcontext}`
+}
+
+export function formatDuration(ms: number): string {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
 
 // Claude Code names a project's transcript folder after its directory, every

@@ -3,17 +3,25 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import {
   claudeProjectDir,
+  describeSession,
+  describeTurn,
+  explorationKind,
   explorePrice,
   isInRepo,
+  isJbcontextCall,
+  jbcontextUsage,
   mergeDays,
   normalizeRepo,
+  parseSessionPhases,
   parseStatsDay,
   parseStatus,
   savedTokens,
   scopeToRepo,
+  searchLabel,
+  statusLine,
   touchesJbcontext,
 } from '../hooks/model'
-import type { JbError, JbSearch } from '../types'
+import type { JbError, JbSearch, JbView } from '../types'
 
 const NOW = Date.parse('2026-10-07T10:00:00Z')
 const HEAD = 'a6f44ddb12b8657bd682019566d0f3ff7449f590'
@@ -157,20 +165,80 @@ test('only jbcontext commands count, index runs flagged', () => {
   expect(touchesJbcontext('git status')).toBe(null)
 })
 
-test('band shows index status and the last search while Claude works', async ($, on) => {
+test('exploration calls are reads, greps, globs, listings and read-only shell commands', () => {
+  expect(explorationKind('mcp__jbcontext__code_search', { text: 'x' })).toBe('jbcontext')
+  expect(explorationKind('Bash', { command: 'jbcontext search --git-remote-url "github.com/a/b" --limit 5 "billing retry"' })).toBe('jbcontext')
+  expect(explorationKind('Grep', { pattern: 'x' })).toBe('local')
+  expect(explorationKind('Bash', { command: 'cd /r && rg -n "foo|bar" src | head' })).toBe('local')
+  expect(explorationKind('Bash', { command: 'git -C /r log --oneline -5' })).toBe('local')
+  expect(explorationKind('Bash', { command: "sed -n '1,20p' a.kt" })).toBe('local')
+  expect(explorationKind('Bash', { command: 'sed -i s/a/b/ a.kt' })).toBe(null)
+  expect(explorationKind('Bash', { command: 'git commit -m "grep fix"' })).toBe(null)
+  expect(explorationKind('Edit', { file_path: 'a.kt' })).toBe(null)
+})
+
+test('the spinner names the query of a jbcontext call', () => {
+  expect(searchLabel('mcp__jbcontext__code_search', { text: 'where is the stats writer' })).toBe('Searching jbcontext: "where is the stats writer"')
+  expect(searchLabel('Bash', { command: 'jbcontext search --git-remote-url "github.com/a/b" --limit 10 "billing retry policy" 2>&1 | head' })).toBe(
+    'Searching jbcontext: "billing retry policy"',
+  )
+  expect(searchLabel('Bash', { command: 'jbcontext repos "payments" --limit 30' })).toBe('Finding repositories in jbcontext: "payments"')
+  expect(searchLabel('Bash', { command: 'jbcontext search' })).toBe('Searching jbcontext')
+  expect(describeTurn({ explorations: 1, jbcontextCalls: 1, jbcontextHits: 1, streak: 0, searching: null, result: null })).toBe(
+    'this turn: 1 exploration call · 1 via jbcontext (1 hit)',
+  )
+})
+
+test('the status line has the index, and the session share once measured', () => {
+  const view = (fields: Partial<JbView>): JbView => ({
+    searches: [],
+    errors: [],
+    otherSearches: 0,
+    otherErrors: 0,
+    index: { state: 'current', branch: 'main', revision: HEAD, at: NOW },
+    repositoryId: null,
+    repoKey: null,
+    indexingSince: null,
+    savings: null,
+    session: null,
+    updatedAt: 0,
+    ...fields,
+  })
+  expect(statusLine(view({}))).toBe('jbcontext ✓ main indexed')
+  expect(statusLine(view({ indexingSince: NOW }))).toBe('jbcontext · indexing…')
+  expect(statusLine(view({ index: { state: 'stale', branch: 'main', head: 'b', revision: 'a', at: NOW } }))).toBe(
+    'jbcontext ⚠ main HEAD not indexed',
+  )
+  expect(statusLine(view({ index: { state: 'unavailable', reason: 'not a git repository' } }))).toBe(undefined)
+  expect(statusLine(view({ index: null }))).toBe(undefined)
+  const session = { sessionId: 's', exploreTokens: 4_000, exploreMs: 1, exploreUsd: 1, totalUsd: 2, jbcontextCalls: 2, jbcontextTokens: 800 }
+  expect(statusLine(view({ session }))).toBe('jbcontext ✓ main indexed · session: 20% of exploring via jbcontext')
+  expect(statusLine(view({ session: { ...session, jbcontextCalls: 0, jbcontextTokens: 0 } }))).toBe(
+    'jbcontext ✓ main indexed · session: jbcontext not used',
+  )
+})
+
+test('during a turn: the spinner says what jbcontext searches, the band counts and nudges, the status line has the index', async ($, on) => {
   mock.env(on, { HOME: '/home/dev' })
-  mock.clock(on, { now: NOW })
+  const clock = mock.clock(on, { now: NOW })
+  // The stats file gains the MCP search's event once the call has run.
+  let stats = DAY
+  let statsMtime = NOW
   on('fs.list', async () => ({
-    value: [{ name: '2026-10-07.json', kind: 'file', size: DAY.length, mtimeMs: NOW, isLink: false }],
+    value: [{ name: '2026-10-07.json', kind: 'file' as const, size: stats.length, mtimeMs: statsMtime, isLink: false }],
   }))
-  on('fs.read', async () => ({ value: DAY }))
+  on('fs.read', async () => ({ value: stats }))
   on('fs.exists', async () => ({ value: true }))
   on('ui.panes', async () => ({ value: [] }))
   on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('turn.start', async (_$, e) => ({ turnId: e.turnId }))
   on('command.register', async (_$, e) => ({ value: { command: e.name } }))
+  const statuses: (string | undefined)[] = []
+  on('ui.status', async (_$, e) => (statuses.push(e.text), { value: undefined }))
   on('ui.render', async ($, e) => {
     const { Text } = $.ui.resolve(e)
-    return h(Text, {}, 'engine band') as RenderElement
+    const props = e.props as { message?: string | null; word?: string; suffix?: string }
+    return h(Text, {}, props.word !== undefined ? `${props.message ?? props.word}${props.suffix ?? ''}` : 'engine') as RenderElement
   })
   on('process.run', async (_$, e) => {
     if (e.argv[0] === 'git') {
@@ -183,48 +251,88 @@ test('band shows index status and the last search while Claude works', async ($,
     }
     return ran(STATUS)
   })
-
-  await $.session.start({ cwd: '/repo', surface: 'terminal' } as never)
-
-  const band = (isWorking: boolean) => ({
-    hasSurvey: false,
-    isWorking,
-    maxRows: 10,
-    bodyColumns: 120,
-    scroll: { offset: 0, bodyRows: 9 },
-    view: {},
+  let release = () => {}
+  on('tool.call', async (_$, e) => {
+    if (e.tool.startsWith('mcp__')) {
+      await new Promise<void>(resolve => (release = resolve))
+      const event = {
+        type: 'search',
+        timestamp: new Date(NOW + 500).toISOString(),
+        clientType: 'MCP',
+        toolName: 'code_search',
+        query: 'stats writer',
+        repositoryUrls: ['github.com/acme/widgets'],
+        resultCount: 12,
+        durationMs: 1400,
+        success: true,
+      }
+      stats = JSON.stringify({ ...JSON.parse(DAY), events: [...JSON.parse(DAY).events, event] })
+      statsMtime = NOW + 1
+    }
+    return { ref: 'r', result: {}, text: 'ok' } as never
   })
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    let ui = await $.ui.mount({ plugin: 'jbcontext-watch', surface, component: 'AbovePrompt', props: band(true) as never })
-    for (let attempt = 0; attempt < 20 && !(await ui.find({ text: /indexed/ })); attempt++) {
-      await ui.unmount()
-      ui = await $.ui.mount({ plugin: 'jbcontext-watch', surface, component: 'AbovePrompt', props: band(true) as never })
-    }
-    expect((await ui.find({ text: /main @ a6f44ddb indexed 1h ago/ }))).toBeDefined()
-    expect((await ui.find({ text: /where is the stats writer/ }))).toBeDefined()
-    expect(await ui.find({ text: /air assistant button/ })).toBeUndefined()
-    expect((await ui.find({ text: /Token is expired/ }))).toBeDefined()
-    await ui.unmount()
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+  await clock.settle()
+  expect(statuses.at(-1)).toBe('jbcontext ✓ main indexed')
 
-    const idle = await $.ui.mount({ plugin: 'jbcontext-watch', surface, component: 'AbovePrompt', props: band(false) as never })
-    expect(await idle.find({ text: /jbcontext/ })).toBeUndefined()
-    await idle.unmount()
-
-    const pane = await $.ui.mount({
+  const band = (isWorking: boolean) =>
+    $.ui.mount({
       plugin: 'jbcontext-watch',
-      surface,
-      component: 'Pane',
-      requestId: 'jbcontext',
-      props: { title: 'jbcontext', bodyColumns: 120 } as never,
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 9 }, view: {} } as never,
     })
-    expect(await pane.find({ text: /Latest searches in widgets/ })).toBeDefined()
-    expect(await pane.find({ text: /where is the stats writer/ })).toBeDefined()
-    expect(await pane.find({ text: /air assistant button/ })).toBeUndefined()
-    expect(await pane.find({ text: /1 more in other repositories/ })).toBeDefined()
-    expect(await pane.find({ text: /Token is expired/ })).toBeDefined()
-    await pane.unmount()
+  const spinner = async () => {
+    const ui = await $.ui.mount({
+      plugin: 'jbcontext-watch',
+      surface: 'terminal',
+      component: 'Spinner',
+      props: { word: 'Thinking', message: null, suffix: '…', mode: 'tool-use' } as never,
+    })
+    const text = (await ui.find({ text: /./ }))?.text
+    await ui.unmount()
+    return text
   }
+
+  await $.turn.start({ text: 'where is it?', turnId: 't1' } as never)
+  for (let call = 0; call < 6; call++) await $.tool.call({ tool: 'Grep', pattern: 'stats' } as never)
+  let ui = await band(true)
+  expect(await ui.find({ text: /this turn: 6 exploration calls · none via jbcontext/ })).toBeDefined()
+  expect(await ui.find({ text: /6 grep\/read calls in a row without jbcontext/ })).toBeDefined()
+  await ui.unmount()
+
+  const search = $.tool.call({ tool: 'mcp__jbcontext__code_search', text: 'where is the stats writer' } as never)
+  await clock.settle()
+  expect(await spinner()).toBe('Searching jbcontext: "where is the stats writer"…')
+  release()
+  await search
+  await clock.settle()
+  expect(await spinner()).toBe('jbcontext: 12 hits in 1.4s')
+  ui = await band(true)
+  expect(await ui.find({ text: /this turn: 7 exploration calls · 1 via jbcontext \(12 hits\)/ })).toBeDefined()
+  expect(await ui.find({ text: /in a row/ })).toBeUndefined()
+  expect(await ui.find({ text: /Token is expired/ })).toBeDefined()
+  await ui.unmount()
+
+  await clock.advance(5_000)
+  expect(await spinner()).toBe('Thinking…')
+  const idle = await band(false)
+  expect(await idle.find({ text: /jbcontext/ })).toBeUndefined()
+  await idle.unmount()
+
+  const pane = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'jbcontext',
+    props: { title: 'jbcontext', bodyColumns: 120 } as never,
+  })
+  expect(await pane.find({ text: /Latest searches in widgets/ })).toBeDefined()
+  expect(await pane.find({ text: /where is the stats writer/ })).toBeDefined()
+  expect(await pane.find({ text: /air assistant button/ })).toBeUndefined()
+  expect(await pane.find({ text: /1 more in other repositories/ })).toBeDefined()
+  await pane.unmount()
 })
 
 test('the pane toggles from the engine record; savings scan only while it is open; a failed price is retried', async ($, on) => {
@@ -304,4 +412,112 @@ test('the pane toggles from the engine record; savings scan only while it is ope
   transcriptMtime = NOW + 1
   await clock.advance(120_000)
   expect(runs).toEqual(['session', 'price', 'price'])
+})
+
+const usage = (billed: number) => ({ input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: billed, output_tokens: 0 })
+const toolUse = (name: string, input: unknown) => ({ type: 'tool_use', id: `t-${name}`, name, input })
+const response = (id: string, billed: number, ...content: unknown[]) =>
+  JSON.stringify({ type: 'assistant', message: { id, usage: usage(billed), content } })
+
+// A response that searched and read (split over two lines, as Claude Code writes one
+// line per content block), one that ran `jbcontext search` in a shell, one that only
+// grepped for the phrase, and one with no tools.
+const TRANSCRIPT = [
+  JSON.stringify({ type: 'user', message: { content: 'where is the stats writer?' } }),
+  response('m1', 1_000, toolUse('mcp__jbcontext__code_search', { text: 'stats writer' })),
+  response('m1', 1_000, toolUse('Read', { file_path: '/r/a.kt' })),
+  response('m2', 300, toolUse('Bash', { command: 'cd /r && jbcontext search "stats writer" | head' })),
+  response('m3', 200, toolUse('Bash', { command: "grep -rn 'jbcontext search' docs | head" })),
+  response('m4', 50, { type: 'text', text: 'Here.' }),
+].join('\n')
+
+const SESSION_ANALYZE = JSON.stringify({
+  tasks: 2,
+  phaseBreakdown: [
+    { phase: 'Exploring', totalTokensBilled: 4_000, totalDurationMs: 75_000, totalCostUsd: 3 },
+    { phase: 'Editing', totalTokensBilled: 1_000, totalDurationMs: 1_000, totalCostUsd: 0.5 },
+    { phase: 'Thinking', totalTokensBilled: 1_000, totalDurationMs: 9_000, totalCostUsd: 0.5 },
+  ],
+})
+
+test('jbcontext calls take their share of the responses that made them', () => {
+  expect(jbcontextUsage(TRANSCRIPT)).toEqual({ calls: 2, tokens: 800 })
+  expect(isJbcontextCall('Bash', { command: '~/.jbcontext/bin/jbcontext repos "billing" --limit 5' })).toBe(true)
+  expect(isJbcontextCall('Bash', { command: 'jbcontext analyze --json-output' })).toBe(false)
+  expect(isJbcontextCall('mcp__glean_default__code_search', {})).toBe(false)
+})
+
+test('the session line gives exploring tokens, time, cost and the jbcontext share', () => {
+  const phases = parseSessionPhases(SESSION_ANALYZE)!
+  expect(phases).toEqual({ exploreTokens: 4_000, exploreMs: 75_000, exploreUsd: 3, totalUsd: 4 })
+  expect(describeSession({ sessionId: 's', ...phases, jbcontextCalls: 2, jbcontextTokens: 800 })).toBe(
+    'jbcontext · this session explored 4K tokens in 1m 15s, ≈$3.00 (75% of $4.00) · jbcontext 2 calls, 20% of exploring tokens',
+  )
+  expect(describeSession({ sessionId: 's', ...phases, jbcontextCalls: 0, jbcontextTokens: 0 })).toContain('jbcontext not used')
+  expect(parseSessionPhases('{}')).toBe(null)
+})
+
+test('a turn that explored ends with the session line; one that did not, or a subagent’s, does not', async ($, on) => {
+  mock.env(on, { HOME: '/home/dev', TMPDIR: '/tmp/dev/' })
+  mock.clock(on, { now: NOW })
+  const project = '/home/dev/.claude/projects/-repo'
+  let transcript = TRANSCRIPT
+  on('session.id', async () => ({ value: 'sess' }))
+  on('fs.stat', async () => ({ value: { kind: 'file' as const, size: transcript.length, mtimeMs: NOW, isLink: false } }))
+  on('fs.list', async (_$, e) => ({
+    value:
+      e.path === `${project}/sess/subagents`
+        ? [{ name: 'agent-1.jsonl', kind: 'file' as const, size: 1, mtimeMs: NOW, isLink: false }]
+        : [],
+  }))
+  on('fs.read', async (_$, e) => ({ value: e.path.endsWith('sess.jsonl') ? transcript : '' }))
+  on('fs.exists', async () => ({ value: false }))
+  on('ui.panes', async () => ({ value: [] }))
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', async (_$, e) => ({ value: { command: e.name } }))
+  on('turn.complete', async (_$, e) => ({ text: e.answer }))
+  on('ui.render', async ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, 'engine') as RenderElement
+  })
+  const linked: string[][] = []
+  let analyzed: string[] = []
+  on('process.run', async (_$, e) => {
+    if (e.argv[0] === 'ln') linked.push([...e.argv])
+    if (e.argv.includes('--projects-dir')) {
+      analyzed = [...e.argv]
+      return ran(SESSION_ANALYZE)
+    }
+    if (e.argv[0] === 'git') return { value: { ...ran('').value, exitCode: 128 } }
+    return ran('')
+  })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+  const turn = (fields: object) =>
+    $.turn.complete({ answer: 'Here.', durationMs: 1_000, isAborted: false, turnId: 't', reason: 'answer', ...fields } as never)
+
+  expect((await turn({})).text).toBe(
+    'jbcontext · this session explored 4K tokens in 1m 15s, ≈$3.00 (75% of $4.00) · jbcontext 2 calls, 20% of exploring tokens',
+  )
+  expect(linked).toEqual([
+    ['ln', '-sf', `${project}/sess.jsonl`, `${project}/sess/subagents/agent-1.jsonl`, '/tmp/dev/jbcontext-watch/sess/session/'],
+  ])
+  expect(analyzed).toContain('/tmp/dev/jbcontext-watch/sess')
+
+  // Nothing new explored: the answer stands alone.
+  expect((await turn({})).text).toBe('Here.')
+  // A subagent's turn never gets the line.
+  transcript = `${TRANSCRIPT}\n${response('m5', 100, toolUse('Read', { file_path: '/r/b.kt' }))}`
+  expect((await turn({ agentId: 'a1' })).text).toBe('Here.')
+
+  const pane = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'jbcontext',
+    props: { title: 'jbcontext', bodyColumns: 120 } as never,
+  })
+  expect(await pane.find({ text: /Explored 4K tokens in 1m 15s, ≈\$3\.00/ })).toBeDefined()
+  expect(await pane.find({ text: /jbcontext: 2 calls, 800 tokens, 20% of exploring/ })).toBeDefined()
+  await pane.unmount()
 })
