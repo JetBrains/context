@@ -15,6 +15,8 @@ The same search is the `mcp__jbcontext__code_search` tool; if that tool is
 listed as deferred, load it with ToolSearch `select:mcp__jbcontext__code_search`
 first. The Bash form needs no loading.
 
+- If the task message already comes with jbcontext search results, that was
+  your first search: start from its best hit instead of searching again.
 - Make the query specific to the task's feature, behavior, error message or
   config flag: "inspection that reports redundant lambda parameter types" >
   "lambda".

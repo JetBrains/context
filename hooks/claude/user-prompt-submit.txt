@@ -1,0 +1,5 @@
+jbcontext ran one semantic search on this task (ranked hits from the indexed revision; uncommitted edits may be missing):
+
+{{search_results}}
+
+Treat this as your first semantic search: if a hit looks right, Read it before any broad grep/find, then continue locally. If none fits, run one narrowed `jbcontext search -p <dir> "<query>"` instead of another broad search.
