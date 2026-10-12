@@ -5,9 +5,15 @@
 When a task requires finding or understanding code whose location you don't
 already know, your FIRST code-discovery step MUST be:
 
-Task(subagent_type='context-explorer',
+Agent(subagent_type='context-explorer', run_in_background=false,
      description=<short label>,
      prompt=<1-2 sentence intent describing what to find>)
+
+Request foreground execution with `run_in_background: false` and wait for the
+report before doing your own code discovery or edits that depend on it. If the
+runtime still launches the agent in the background, wait for its completion
+notification before that dependent work. If the explorer fails, continue with
+the direct search workflow below.
 
 Start there instead of opening with your own `grep`/`glob`/`bash` searches or
 git history: the subagent runs the semantic exploration in its own context and
