@@ -1,1 +1,0 @@
-Tip: when you need code whose location you do not know, at any point of the task, run `jbcontext search "<full sentence with names from the task>"` and read the returned code blocks before opening files.
