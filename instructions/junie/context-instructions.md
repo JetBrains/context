@@ -12,7 +12,13 @@ Use it whenever you need code whose location you do not know yet, at any point o
 - callers, related implementations, extension points or registrations of the code you are changing;
 - existing tests for that code, and examples of similar tests to copy the setup from.
 
-Prefer it over repeated grep/find rounds and over listing directories. Use exact search when you already know the exact identifier and only need its occurrences.
+Prefer it over repeated grep/find rounds and over listing directories. In a large repository a class or message named in the task usually has many usages, look-alikes and test fixtures; a search that combines the name with the described behaviour finds the implementation and its tests faster than grepping the name.
+
+### When not to
+
+- You already know the exact identifier and only need its occurrences, or the file is already open: use exact search or open it.
+- Git operations, builds and running tests.
+- Do not search again for something you have already found; search again only when a new question comes up. Most tasks need one to four searches.
 
 ### How to use it
 

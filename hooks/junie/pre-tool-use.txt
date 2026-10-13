@@ -1,1 +1,1 @@
-Tip: when you need code whose location you do not know, at any point of the task, run `jbcontext search "<full sentence with names from the task>"` and read the returned code blocks before opening files.
+Tip: for a new "where is ..." question (the code to change, its callers, related implementations, existing tests), `jbcontext search "<full sentence with names from the task>"` answers it in one call; for occurrences of an exact identifier you already know, use exact search.
