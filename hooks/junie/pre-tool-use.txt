@@ -1,1 +1,1 @@
-Tip: for a new "where is ..." question (the code to change, its callers, related implementations, existing tests), `jbcontext search "<full sentence with names from the task>"` answers it in one call; for occurrences of an exact identifier you already know, use exact search.
+Tip: for "which code does X" questions about behaviour, `jbcontext search --limit 6 "<6-12 word question>"` answers in one call; for known names, definitions and usages use grep or glob.

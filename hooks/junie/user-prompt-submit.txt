@@ -1,1 +1,1 @@
-Tip: when you need code whose location you do not know, at any point of the task, run `jbcontext search "<full sentence with names from the task>"` and read the returned code blocks before opening files.
+Tip: when you do not know which code implements a behaviour, run `jbcontext search --limit 6 "<6-12 word question about the behaviour>"` and open the top results at the shown lines; once you have read the code to change, edit it before searching further.
