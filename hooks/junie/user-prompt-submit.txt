@@ -1,1 +1,1 @@
-Tip: when you need code whose location you do not know, spawn the `context-explorer` subagent with the behaviour and names from the task; for a single later "where is ..." question run `jbcontext search "<full sentence>"` yourself, and use exact search for identifiers you already know.
+Tip: when you do not know which code implements a behaviour, run `jbcontext search --limit 6 "<6-12 word question about the behaviour>"` and open the top results at the shown lines; once you have read the code to change, edit it before searching further.

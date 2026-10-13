@@ -1,1 +1,1 @@
-Tip: when you need code whose location you do not know, spawn the `context-explorer` subagent with the behaviour and names from the task; for a single later "where is ..." question run `jbcontext search "<full sentence>"` yourself, and use exact search for identifiers you already know.
+Tip: for "which code does X" questions about behaviour, `jbcontext search --limit 6 "<6-12 word question>"` answers in one call; for known names, definitions and usages use grep or glob.
