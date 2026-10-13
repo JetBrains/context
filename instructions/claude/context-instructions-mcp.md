@@ -1,27 +1,11 @@
-# Tools
+# Code search
 
-## Semantic Code Search (jbcontext)
+`mcp__jbcontext__code_search` finds code by meaning. It is a deferred tool, so in your first turn load it in parallel with your first Bash command:
 
-You have access to the jbcontext MCP `code_search` tool for searching the codebase semantically.
-This tool can search for code snippets related in meaning to the search query and search objective.
+ToolSearch {"query": "select:mcp__jbcontext__code_search"}
 
-### When to use
+In your next turn call it once, in parallel with your next command - also when the task names a class or symbol, because it ranks the files a grep misses:
 
-`code_search` is a **code-discovery** tool. Reach for it only when a task requires finding or understanding code whose location you don't already know.
+{"text": "<what the code does, in plain words>", "topK": 5}
 
-Skip it - go straight to the right tool - when:
-
-- the task names the exact file, class, or symbol (keyword grep is faster);
-- the relevant file is already open or identified;
-- the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds, shell/statusline/config setup, or reviewing a diff you already have.
-
-### Single-Shot Policy
-
-When the relevant file or subsystem *is* still unknown, use `code_search` as the semantic bootstrap:
-
-- If no relevant file is open yet, start with one `code_search`.
-- Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
-- After the first search, open at least one returned file and inspect it locally.
-- If the first hit is relevant but incomplete, inspect neighboring files locally in that same directory or subsystem before any semantic retry.
-- After the first relevant file or path is known, prefer direct file reads and exact search to inspect nearby code.
-- If a semantic retry is still needed, set `pathFilter` to the directory of the best first hit.
+Always pass `text` (not `query`). Read the best hit from either result. Retry at most once, adding "pathFilter": "<dir>".
