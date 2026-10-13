@@ -14,7 +14,7 @@ Use it when a new "where is ..." question comes up: first to find the code to ch
 ## Usage
 
 ```bash
-jbcontext search "<full sentence describing the behaviour, with names from the task>"
+jbcontext search --limit 6 "<full sentence describing the behaviour, with names from the task>"
 jbcontext search "<code snippet>"                # find similar code
 jbcontext search -p <dir> "<query>"              # <dir> is relative to the repository root, not the current directory
 ```
@@ -22,6 +22,6 @@ jbcontext search -p <dir> "<query>"              # <dir> is relative to the repo
 ## Tips
 
 - Name the feature, class, method, setting or message from the task: "where the debugger evaluates watches for Kotlin coroutines" > "watches".
-- Read the returned code first; open a file only when you need more than the shown lines.
+- Read the returned code first; when you need more than the shown lines, open that file at that line range instead of finding it again with grep or glob.
 - If the results are off, rephrase with other terms or narrow with `-p` to the directory of the best hit.
 - Do not run `cd` before searching; run it from the repository root.
