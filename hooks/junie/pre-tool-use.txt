@@ -1,1 +1,1 @@
-Tip: for a new "where is ..." question (the code to change, its callers, related implementations, existing tests), `jbcontext search "<full sentence with names from the task>"` answers it in one call; for occurrences of an exact identifier you already know, use exact search.
+Tip: when you need code whose location you do not know, spawn the `context-explorer` subagent with the behaviour and names from the task; for a single later "where is ..." question run `jbcontext search "<full sentence>"` yourself, and use exact search for identifiers you already know.

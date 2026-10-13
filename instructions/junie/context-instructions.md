@@ -23,7 +23,6 @@ Prefer it over repeated grep/find rounds and over listing directories. In a larg
 ### How to use it
 
 - Write a full sentence that describes the behaviour, and include the class, method, setting or message names from the task: "where the Gradle sync reports unresolved dependencies to the build tool window".
-- Run it as `jbcontext search --limit 6 "<sentence>"`: six results are enough, more only fill the context.
-- Read the returned code blocks first: often they already answer the question. To see more of a result, open the shown file at the shown line range instead of finding it again with grep or glob.
+- Read the returned code blocks first: often they already answer the question, and you can edit or open the exact line range instead of reading whole files.
 - One question per search. If the results are off, rephrase with different terms instead of repeating the same query.
 - `-p <path>` limits the search to a directory; the path is relative to the repository root, not to the current directory.
