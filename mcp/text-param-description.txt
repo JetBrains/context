@@ -1,1 +1,1 @@
-One focused natural-language description of the code or behavior to find, including relevant task terminology.
+Required, nonempty natural-language description of one behavior or implementation to locate. Include relevant feature, error, or symbol names. Pass this as text.

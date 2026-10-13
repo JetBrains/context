@@ -1,1 +1,1 @@
-Optional directory or file relative to the project root. Omit when the relevant scope is unknown.
+Optional verified directory or file relative to the repository root. Omit if unsure; remove or correct a filter that produces no hits.
