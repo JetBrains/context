@@ -1,1 +1,1 @@
-Tip: when you need code whose location you do not know, at any point of the task, run `jbcontext search "<full sentence with names from the task>"` and read the returned code blocks before opening files.
+Tip: when you need code whose location you do not know, spawn the `context-explorer` subagent with the behaviour and names from the task; for a single later "where is ..." question run `jbcontext search "<full sentence>"` yourself, and use exact search for identifiers you already know.
