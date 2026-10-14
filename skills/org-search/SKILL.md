@@ -3,7 +3,7 @@ name: org-search
 context: fork
 agent: Explore
 argument-hint: query
-description: "Experimental jbcontext org-wide semantic search across multiple repositories"
+description: "Experimental jbcontext org-wide semantic search across multiple repositories. Use when the code you need may live outside the current repository: a service, client, shared library, schema, or behavior defined or used in another repo, or prior art elsewhere in the organization."
 ---
 
 Use this skill to research `$ARGUMENTS` across all available repositories, especially when the answer may live outside the current repo.
