@@ -82,7 +82,7 @@ jbcontext search --git-remote-url "<repo-git-remote-url>" --json-output --limit 
 
 Run `jbcontext search --help` to confirm the flag for the installed experimental CLI if `--git-remote-url` is rejected, but still pass the exact git-remote-url from the project's curated list or `jbcontext repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Resolve snippets and repo information with `gh`.** When `jbcontext search` returns promising snippets, use the GitHub CLI to fetch full source files, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `jbcontext repos` when available.
+5. **Resolve snippets from the local checkout first.** When `jbcontext search` returns promising snippets and that repository is on disk (e.g. a sibling directory), read the files there. Only when it is not on disk, and the GitHub CLI is available, use `gh` to fetch full source files, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `jbcontext repos` when available.
 
 ```bash
 gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,url
@@ -99,4 +99,4 @@ gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/
 - Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search; if a description query returns nothing, fall back to name terms.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
-- Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.
+- Resolve snippets into full source context from the local checkout; fall back to `gh` only for repositories that are not on disk.

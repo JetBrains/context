@@ -17,4 +17,4 @@ jbcontext search --git-remote-url "<repo url from jbcontext repos>" --limit 10 "
 
 - A prefix such as `jcp-*` is a repo-family constraint: query it literally and keep every match.
 - Report which repos you searched and what matched; if nothing matched, say which filters you tried.
-- Open the full file before stating a cross-repo snippet as fact - the index may lag. Read it from the local checkout when that repository is on disk (e.g. a sibling directory), otherwise fetch it (e.g. via `gh`).
+- Open the full file before stating a cross-repo snippet as fact - the index may lag. Read it from the local checkout when that repository is on disk (e.g. a sibling directory), otherwise fetch it with `gh` if it is available.
