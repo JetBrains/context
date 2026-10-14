@@ -1,1 +1,1 @@
-Required, nonempty natural-language description of one behavior or implementation to locate. Include relevant feature, error, or symbol names. Pass this as text.
+Required, nonempty natural-language description of one implementation, caller, test, or documentation/specification question. Include relevant feature, error, or symbol names. For documentation, describe the behavior, rule, or configuration to find. Pass this as text.
