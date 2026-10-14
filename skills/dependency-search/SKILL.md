@@ -3,7 +3,7 @@ name: dependency-search
 context: fork
 agent: Explore
 argument-hint: dependency query
-description: "Experimental jbcontext org-wide dependency search across multiple repositories. Use when need to find APIs in other repositories, or dependency configuration are used across repos for upgrades, removals, CVEs, migrations, or ownership discovery."
+description: "Experimental jbcontext org-wide dependency search across multiple repositories. Use when you need to find which repositories use an API, library, or dependency configuration, for upgrades, removals, CVEs, migrations, or ownership discovery."
 ---
 
 Use this skill to research `$ARGUMENTS` across all available repositories when the question is about dependency usage, dependency ownership, upgrade planning, migration scope, version drift, or remediation.

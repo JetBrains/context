@@ -3,7 +3,7 @@ name: blast-radius
 context: fork
 agent: Explore
 argument-hint: change or contract query
-description: "Experimental jbcontext org-wide blast-radius analysis across multiple repositories. Use when Codex needs to estimate the impact of changing an API, endpoint, schema, event, shared library, config, feature flag, data model, behavior, or dependency by finding producers, consumers, owners, tests, and related repos."
+description: "Experimental jbcontext org-wide blast-radius analysis across multiple repositories. Use when you need to estimate the impact of changing an API, endpoint, schema, event, shared library, config, feature flag, data model, behavior, or dependency by finding producers, consumers, owners, tests, and related repos."
 ---
 
 Use this skill to research `$ARGUMENTS` across all available repositories when the question is about impact analysis, consumers, producers, compatibility risk, migration scope, rollout planning, or cross-repo ownership.
