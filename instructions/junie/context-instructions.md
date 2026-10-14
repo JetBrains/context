@@ -1,33 +1,38 @@
-# Semantic Code Search (jbcontext)
+# Tools
 
-`jbcontext search "<query>"` searches the whole repository by meaning and returns the best matching code blocks: file path, line range and the code itself.
+## Semantic Code Search (jbcontext)
+
+`jbcontext search "<query>"` searches the whole repository by meaning and returns the best matching code blocks: file path, line range and the code itself. It is usually the fastest way to find where something is implemented, which code a change affects, and which tests cover it. Use the `/context-search` skill for details.
 
 ### When to use
 
-Use it when you need code whose location you do not know yet:
+Use it whenever you need code whose location you do not know yet, at any point of the task, not only at the start:
 
-- the implementation of behaviour described in the question;
-- callers, related implementations, extension points or registrations;
-- existing tests for that code, and examples of similar tests.
+- the implementation of the behaviour described in the issue;
+- callers, related implementations, extension points or registrations of the code you are changing;
+- existing tests for that code, and examples of similar tests to copy the setup from.
 
-Prefer it over repeated grep/find rounds and over listing directories.
+Prefer it over repeated grep/find rounds and over listing directories. In a large repository a class or message named in the task usually has many usages, look-alikes and test fixtures; a search that combines the name with the described behaviour finds the implementation and its tests faster than grepping the name.
 
-### When not to use
+### When not to
 
-- You already know the exact identifier and only need its occurrences, or the file is already open.
+- You already know the exact identifier and only need its occurrences, or the file is already open: use exact search or open it.
 - Git operations, builds and running tests.
-- Do not search again for something you have already found; search again only when a genuinely new question arises.
-- Do not use it to explore tangentially related code after you have already found the direct answer. Each additional search adds cost; only search when you have a specific unanswered question.
+- Do not search again for something you have already found; search again only when a new question comes up. Most tasks need one to four searches.
 
-### How to phrase queries
+### How to use it
 
-- Write a full sentence describing the behaviour, including class/method/setting names from the task.
-- One question per search. If results are off, rephrase with different terms instead of repeating the same query.
-- Be specific: include the concrete action or concept, not just a class name. For example, "test that CombinedTrimmer drops low-priority messages and slices content" is better than "trimming tests".
+- Write a full sentence that describes the behaviour, and include the class, method, setting or message names from the task: "where the Gradle sync reports unresolved dependencies to the build tool window".
+- Read the returned code blocks first: often they already answer the question, and you can edit or open the exact line range instead of reading whole files.
+- One question per search. If the results are off, rephrase with different terms instead of repeating the same query.
+- `-p <path>` limits the search to a directory; the path is relative to the repository root, not to the current directory.
 
-### How to act on results
+### Several questions at once
 
-- Read the returned code blocks carefully before opening whole files or running more searches. Often the blocks already answer the question directly.
-- Trust the top results. If the first search returns blocks that clearly answer the question, use them and do not run follow-up searches or open additional files to gather surrounding context.
-- When a returned block shows enough detail (e.g., test method names, parameter lists, class structure), extract your answer from it without viewing the full file.
-- Do not chase references from returned results into other files unless those files are themselves needed to answer the question.
+Searches do not depend on each other. When you have more than one open question (the implementation, its callers, its tests), ask them all in one terminal command instead of one per step; each search prints its own results:
+
+```bash
+jbcontext search --limit 5 "<question 1>"; jbcontext search --limit 5 "<question 2>"
+```
+
+Then open every line range you need from the results in one file-viewing step, not file by file.
