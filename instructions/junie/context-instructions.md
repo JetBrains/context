@@ -18,12 +18,12 @@ Prefer it over repeated grep/find rounds and over listing directories. In a larg
 
 - You already know the exact identifier and only need its occurrences, or the file is already open: use exact search or open it.
 - Git operations, builds and running tests.
-- Do not search again for something you have already found; search again only when a new question comes up. Most tasks need one to four searches.
+- Do not search again for something you have already found; search again only when a new question comes up.
 
 ### How to use it
 
 - Write a full sentence that describes the behaviour, and include the class, method, setting or message names from the task: "where the Gradle sync reports unresolved dependencies to the build tool window".
-- Read the returned code blocks first: often they already answer the question, and you can edit or open the exact line range instead of reading whole files.
+- Each result shows the file path and line range of the match: open that range instead of the whole file, and read further when the change needs more context.
 - One question per search. If the results are off, rephrase with different terms instead of repeating the same query.
 - `-p <path>` limits the search to a directory; the path is relative to the repository root, not to the current directory.
 

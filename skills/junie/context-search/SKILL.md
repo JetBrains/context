@@ -9,7 +9,7 @@ argument-hint: query
 
 `jbcontext search` returns the most relevant code blocks of the repository for a natural-language question. Each result has the file path, the line range and the code, so you can often act on it directly.
 
-Use it when a new "where is ..." question comes up: first to find the code to change, later to find its callers, related implementations and tests. One search per question; do not repeat a search for something you have already found. For occurrences of an exact identifier you already know, exact search is faster.
+Use it when a new "where is ..." question comes up: first to find the code to change, later to find its callers, related implementations and tests. Do not repeat a search for something you have already found. For occurrences of an exact identifier you already know, exact search is faster.
 
 ## Usage
 
@@ -23,6 +23,6 @@ jbcontext search --limit 5 "<question 1>"; jbcontext search --limit 5 "<question
 ## Tips
 
 - Name the feature, class, method, setting or message from the task: "where the debugger evaluates watches for Kotlin coroutines" > "watches".
-- Read the returned code first; open a file only when you need more than the shown lines.
+- Open the returned line range instead of the whole file, and read further when you need more context.
 - If the results are off, rephrase with other terms or narrow with `-p` to the directory of the best hit.
 - Do not run `cd` before searching; run it from the repository root.
