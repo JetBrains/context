@@ -1,12 +1,14 @@
 # Repository discovery: code, tests, and documentation
 
-When you need to locate an implementation, callers, related tests, or documentation/specifications and do not know the relevant file, you MUST run `jbcontext search` before repository-wide grep, globbing, or guessing directories. Put it at the start of the same Bash call as your grep for names from the task, so neither waits for the other:
+When you need to locate an implementation, callers, related tests, or documentation/specifications and do not know the relevant file, you MUST run `jbcontext search` before repository-wide grep, globbing, or guessing directories. Names in an issue or stack trace are query clues, not proof that the responsible implementation is located. Put it at the start of the same Bash call as your grep for names from the task, so neither waits for the other:
 
 ```bash
 jbcontext search --limit 5 "<one discovery question, with relevant feature or symbol names>"; <your grep>
 ```
 
-Apply this rule to each new unresolved discovery question, including tests or documentation needed after locating the implementation. Finding one file does not finish all discovery. No search is required merely upon receiving a task, for a fully located edit, or for running tests/builds, git operations, or reviewing a supplied diff.
+Apply this rule to each new unresolved discovery question, including tests or documentation needed after locating the implementation. Finding one file does not finish all discovery. Do not run searches for questions you do not need answered.
+
+Read known or explicitly supplied files directly; use exact searches within the located area. No search is required merely upon receiving a task, for a fully located edit, or for running tests/builds, git operations, or reviewing a supplied diff. If local inspection leaves a new location unknown, return to semantic search before broadening exploration.
 
 Example queries:
 
