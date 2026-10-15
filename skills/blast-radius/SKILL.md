@@ -82,7 +82,7 @@ jbcontext search --git-remote-url "<repo-git-remote-url>" --json-output --limit 
 
 Run `jbcontext search --help` to confirm the flag for the installed experimental CLI if `--git-remote-url` is rejected, but still pass the exact git-remote-url from the project's curated list or `jbcontext repos`. Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Check snippets in the local checkout.** When `jbcontext search` returns promising snippets and that repository is on disk (e.g. a sibling directory), read the files there before relying on the match; otherwise rely on the snippet.
+5. **Check snippets on disk.** If the repository is checked out locally, read the file there before relying on a snippet.
 
 6. **Synthesize blast-radius findings.** Report which repos were searched, which repos had useful matches, the strongest producers/consumers/files/symbols found, likely impacted surfaces, and unresolved unknowns. Separate confirmed impacts from plausible leads. If no suitable repo is found, say whether the project's curated list (`CLAUDE.md`/`AGENTS.md`) had a relevant row and which `jbcontext repos` filters were tried before stopping. If a relevant repo seems to be missing from the curated list, note it (with its `repository` git-remote-url if known) so the project's list can be updated.
 
