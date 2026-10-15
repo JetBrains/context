@@ -53,12 +53,7 @@ jbcontext search --git-remote-url "<repository>" --json-output --limit 10 "<sema
 
 Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Resolve snippets from the local checkout first.** When `jbcontext search` returns promising snippets and that repository is on disk (e.g. a sibling directory), read the files there. Only when it is not on disk, and the GitHub CLI is available, use `gh` to fetch full manifests, lockfiles, source files, surrounding code, default branch, repo metadata, owners, recent commits, or related dependency PRs/issues before relying on the match. Use the GitHub owner/name or URL from `jbcontext repos` when available.
-
-```bash
-gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,url
-gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/vnd.github.raw"
-```
+5. **Check snippets in the local checkout.** When `jbcontext search` returns promising snippets and that repository is on disk (e.g. a sibling directory), read the files there before relying on the match; otherwise rely on the snippet.
 
 6. **Synthesize dependency findings.** Report which repos were searched, which repos had useful matches, the dependency declarations/usages found, known versions or config variants, likely owners, and recommended follow-up checks. If no suitable repo is found, say which repo filters were tried before stopping.
 
@@ -70,4 +65,3 @@ gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/
 - Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search; if a description query returns nothing, fall back to name terms.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
-- Resolve snippets into full source context from the local checkout; fall back to `gh` only for repositories that are not on disk.
