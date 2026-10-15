@@ -25,9 +25,9 @@ Stop early - without using the full budget - when any of these is true:
 
 When you do search again, refine: narrow with `pathFilter` once you know the right directory, or rephrase the intent more precisely. Do not repeat the same query.
 
-If the intent names another repository or service, or the answer may live outside the repository you are in, call `mcp__jbcontext__find_repositories` with a short description of what you need, then pass one of the returned ids to `code_search` as `repository`, exactly as listed (e.g. `github.com/acme/billing-service`). A bare name such as `billing-service` is not an id and finds no index. This call does not count toward the search budget.
+If the intent names another repository or service, or the answer may live outside the repository you are in, call `mcp__jbcontext__find_repositories` with a short description of what you need, then pass one of the returned ids to `code_search` as `repository`, exactly as listed (e.g. `github.com/acme/billing-service`). This call does not count toward the search budget.
 
-Search result paths are relative to the root of their repository, not to your working directory. A result labelled `jcp-air: File: src/A.kt` is `src/A.kt` inside the `jcp-air` checkout: read `jcp-air/src/A.kt` when your working directory holds that checkout, `../jcp-air/src/A.kt` when you are inside a sibling repository, and `Glob` for a directory of that name if neither exists. If the repository is not on disk, report the snippet from the search result instead of reading.
+If a result's repository is not on disk, report the snippet from the search result instead of reading.
 </workflow>
 
 <query_style>
