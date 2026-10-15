@@ -3,7 +3,7 @@ name: dependency-search
 context: fork
 agent: Explore
 argument-hint: dependency query
-description: "Experimental jbcontext org-wide dependency search across multiple repositories. Use when you need to find which repositories use an API, library, or dependency configuration, for upgrades, removals, CVEs, migrations, or ownership discovery."
+description: "Experimental jbcontext org-wide dependency search across multiple repositories. Use when need to find APIs in other repositories, or dependency configuration are used across repos for upgrades, removals, CVEs, migrations, or ownership discovery."
 ---
 
 Use this skill to research `$ARGUMENTS` across all available repositories when the question is about dependency usage, dependency ownership, upgrade planning, migration scope, version drift, or remediation.
@@ -53,7 +53,7 @@ jbcontext search --git-remote-url "<repository>" --json-output --limit 10 "<sema
 
 Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Check snippets in the local checkout.** When `jbcontext search` returns promising snippets and that repository is on disk (e.g. a sibling directory), read the files there before relying on the match; otherwise rely on the snippet.
+5. **Check snippets on disk.** If the repository is checked out locally, read the file there before relying on a snippet.
 
 6. **Synthesize dependency findings.** Report which repos were searched, which repos had useful matches, the dependency declarations/usages found, known versions or config variants, likely owners, and recommended follow-up checks. If no suitable repo is found, say which repo filters were tried before stopping.
 

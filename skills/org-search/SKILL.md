@@ -3,7 +3,7 @@ name: org-search
 context: fork
 agent: Explore
 argument-hint: query
-description: "Experimental jbcontext org-wide semantic search across multiple repositories. Use when the code you need may live outside the current repository: a service, client, shared library, schema, or behavior defined or used in another repo, or prior art elsewhere in the organization."
+description: "Experimental jbcontext org-wide semantic search across multiple repositories. Use when the code may live in another repository."
 ---
 
 Use this skill to research `$ARGUMENTS` across all available repositories, especially when the answer may live outside the current repo.
@@ -54,7 +54,7 @@ jbcontext search --git-remote-url "<repository>" --json-output --limit 10 "<sema
 
 Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Check snippets in the local checkout.** When `jbcontext search` returns promising snippets and that repository is on disk (e.g. a sibling directory), read the files there before relying on the match; otherwise rely on the snippet.
+5. **Check snippets on disk.** If the repository is checked out locally, read the file there before relying on a snippet.
 
 6. **Synthesize across repositories.** Report which repos were searched, which repos had useful matches, and the strongest files/symbols found. If no suitable repo is found, say which repo filters were tried before stopping.
 
