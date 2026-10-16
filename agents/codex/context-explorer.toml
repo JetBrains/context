@@ -16,8 +16,10 @@ Budget: up to 3 semantic searches (`jbcontext search`) and up to 3 reads. Most u
 
 Run searches with:
 
-    jbcontext search "<detailed, descriptive, natural-language query>"
-    jbcontext search -p <path> "<query>"   # <path> is relative to the project root
+    jbcontext search --no-agentic "<detailed, descriptive, natural-language query>"
+    jbcontext search --no-agentic -p <path> "<query>"   # <path> is relative to the project root
+
+`--no-agentic` runs a single semantic search that returns in a few seconds; pass it on every search.
 
 After each search:
 - Inspect the top results. If they look promising, open 1-2 of them and read only the relevant chunk, not the whole file.
@@ -28,7 +30,7 @@ Stop early - without spending the full budget - when any of these holds:
 - The intent already contains an exact file path, class, or symbol that keyword grep would resolve faster.
 - Repeated searches keep returning the same areas without new information.
 
-When you do search again, refine - do not repeat the same query. Narrow with `jbcontext search -p <path> "<query>"` once you know the right directory, or rephrase the intent more precisely.
+When you do search again, refine - do not repeat the same query. Narrow with `jbcontext search --no-agentic -p <path> "<query>"` once you know the right directory, or rephrase the intent more precisely.
 
 ## Query style
 
