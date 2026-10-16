@@ -1,13 +1,19 @@
 # Tools
 
-## Code discovery: jbcontext search first
+## Code discovery: anchor first, then jbcontext search
 
 When a task requires finding or understanding code whose location you don't
-already know, your FIRST code-discovery step MUST be a `jbcontext search` for
-that question (see below), run before your own `grep`/`glob`/`bash` searches or
-git history.
+already know, pick the first discovery step by what the task gives you:
 
-Read the results and judge whether they answer the question. Often a single
+- **Named anchor**: the task names an identifier you can match exactly - a
+  class, function, file, config key, CLI flag, or error message. Locate it with
+  `grep`/`rg` first; that takes about a second. Run `jbcontext search` only if
+  exact search finds nothing relevant.
+- **Semantic question**: the task describes behavior without naming the code,
+  or you need the subsystem that implements a concept. Your first step is a
+  `jbcontext search` for that question (see below).
+
+After a `jbcontext search`, judge whether its results answer the question. Often a single
 search is enough - then switch to direct file reads. Only if the search result
 is insufficient, delegate the remaining exploration to the context-explorer
 subagent:
@@ -72,7 +78,7 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 
 Use `jbcontext search` as a semantic bootstrap when the relevant file or subsystem is still unknown.
 
-- If no relevant file is open yet, start with one `jbcontext search`.
+- For a semantic question with no relevant file open yet, start with one `jbcontext search`.
 - Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
 - After the first search, open at least one returned file and inspect it locally.
 - If the first hit is relevant but incomplete, inspect neighboring files locally in that same directory or subsystem before any semantic retry.

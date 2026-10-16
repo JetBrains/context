@@ -20,9 +20,10 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 
 ### How to use it
 
-- Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know the right file, subsystem, implementation, or related test.
+- Pick the first discovery step by what the task gives you:
+  - **Named anchor**: the issue names an identifier you can match exactly - a class, function, file, config key, CLI flag, or error message. Locate it with `rg` first; that takes about a second. Use `jbcontext search` only if exact search finds nothing relevant.
+  - **Semantic question**: the issue describes behavior without naming the code, or you need the subsystem that implements a concept. Start with `jbcontext search`.
 - Use one focused natural-language query per search.
-- Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
 - Once you get a relevant hit, switch to direct file reads - needing another search is a sign to delegate to `context_explorer` (with the results you already have) instead of searching again yourself.
 
 ## Subagent: `context_explorer`
@@ -44,7 +45,7 @@ files.
 
 ## When to use `jbcontext search` CLI vs. `context_explorer` subagent
 
-Always run `jbcontext search` for the question first - even when you expect the
+For a semantic question, run `jbcontext search` first - even when you expect the
 discovery to be multi-step (mapping an unfamiliar subsystem, or tracing across
 several files). Often a single search is enough. Only if its results are
 insufficient, spawn `context_explorer`, and include in its `message` the key
