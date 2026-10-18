@@ -17,9 +17,9 @@ or directly linked from them (e.g. in another module): start that search with `j
 Skip it for named or known targets (grep), open files, or non-search tasks (git, running tests, etc.).
 Use one focused query per search. Open the first relevant hit, then read or grep directly. Search broadly again only if
 stuck; otherwise narrow with -p <path>.
-Never crop the output (no `| head`, `| tail`); for shorter output use `--limit 5`.
+Never crop the output (no `| head`, `| tail`); always use `--limit 5`.
 
 ```bash
-jbcontext search "code that retries failed HTTP requests with exponential backoff"
+jbcontext search --limit 5 "code that retries failed HTTP requests with exponential backoff"
 jbcontext search -p src/auth --limit 5 "Where is the code that verifies a JWT's signature and checks that it has not expired?"
 ```
