@@ -9,6 +9,8 @@ repo and don't know where to look.
 When code discovery *is* needed and no relevant file or subsystem is known yet, your first code-search action MUST be
 `jbcontext search` - do not open with `rg`/`grep`/`find` or git history. This mandate governs *how* you start searching,
 not whether every task needs a search.
+The same applies when you already know some relevant files but still need to find another one that may not be close to
+or directly linked from them (e.g. in another module): start that search with `jbcontext search`, not grep.
 
 ### Usage
 
