@@ -14,39 +14,45 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 
 ### Query Tips
 
-- Be descriptive: "function that validates user email addresses" > "email"
-- Include context: "error handling middleware for HTTP requests with logging"
+- Be descriptive: "Where is a function that validates user email addresses" > "email"
+- Include context: "Find error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
 
 ### When to use
 
-`jbcontext search` is a **code-discovery** tool. Reach for it only when a task requires finding or understanding code whose location you don't already know.
+`jbcontext search` is a **search tool for repositories**. Use it when you need to find something in the
+repo and don't know where to look.
 
 Skip it - go straight to the right tool - when:
 
 - the task names the exact file, class, or symbol (keyword grep is faster);
 - the relevant file is already open or identified;
-- the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds, shell/statusline/config setup, or reviewing a diff you already have.
+- the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds,
+  shell/statusline/config setup, or reviewing a diff you already have.
 
-### Single-Shot Policy
+### How to use it
 
-When the relevant file or subsystem *is* still unknown, use `jbcontext search` as the semantic bootstrap:
-
-- If no relevant file is open yet, start with one `jbcontext search`.
-- Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
-- After the first search, open at least one returned file and inspect it locally.
-- If the first hit is relevant but incomplete, inspect neighboring files locally in that same directory or subsystem before any semantic retry.
-- After the first relevant file or path is known, prefer direct file reads and exact search to inspect nearby code.
-- If a semantic retry is still needed, use `jbcontext search -p <path> ...` with the directory of the best first hit.
+- Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know
+  the right file, subsystem, implementation, or related test.
+- Use one focused natural-language query per search.
+- Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
+- Inspect the first relevant file or directory before issuing another broad semantic search.
+- Use another broad `jbcontext search` only if the local path stops being productive.
+- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
+  inspection.
+- If you search again after finding a relevant area, narrow with `-p <path>`.
 
 ### Examples
 
 ```bash
-# Find authentication-related code
-jbcontext search "user authentication login flow"
+# Find code by its behavior
+jbcontext search "code that retries failed HTTP requests with exponential backoff"
 
 # Narrow to specific directory
-jbcontext search -p src/auth "JWT token validation"
-```
+jbcontext search -p src/auth "Where is the code that verifies a JWT's signature and checks that it has not expired?"
+# Find related tests
+jbcontext search -p test "tests checking that unauthenticated requests are rejected by middleware"
 
-Use `jbcontext search` once to get the initial pointer, then inspect nearby code locally. If that still fails, do a narrowed retry with `-p`.
+# Find documentation or specs
+jbcontext search "design doc describing how the authentication flow handles token refresh"
+```
