@@ -5,7 +5,9 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -50,47 +52,104 @@ class CategorizeTest(unittest.TestCase):
         self.assertEqual(b("echo hi"), "neutral")
 
 
-class PrefilterTest(unittest.TestCase):
-    def test_grep_tool(self):
-        self.assertTrue(gh.prefilter_allows("Grep", {"pattern": "x", "path": "src/auth/Login.kt"}, "/repo"))
-        self.assertTrue(gh.prefilter_allows("Grep", {"pattern": "x", "path": "src/auth"}, "/repo"))
-        self.assertTrue(gh.prefilter_allows("Grep", {"pattern": "x", "path": "/tmp/out.log"}, "/repo"))
-        self.assertFalse(gh.prefilter_allows("Grep", {"pattern": "x"}, "/repo"))
-        self.assertFalse(gh.prefilter_allows("Grep", {"pattern": "x", "path": "/repo"}, "/repo"))
-        self.assertFalse(gh.prefilter_allows("Grep", {"pattern": "x", "path": "src"}, "/repo"))
-
-    def test_bash(self):
-        p = lambda c: gh.prefilter_allows("Bash", {"command": c}, "/repo")  # noqa: E731
-        self.assertTrue(p("rg -n foo src/auth"))
-        self.assertTrue(p("grep -rn foo src/auth/Login.kt 2>/dev/null"))
-        self.assertTrue(p("rg -e foo -e bar src/main/kotlin"))
-        self.assertFalse(p("rg -n 'retry'"))
-        self.assertFalse(p("rg -n retry ."))
-        self.assertFalse(p("find . -name '*.kt'"))
-        self.assertTrue(p("find build/reports -name '*.xml'"))
-
-
 class ClassifierInputTest(unittest.TestCase):
-    """The classifier sees recent steps and reasoning, never the pending call itself."""
+    """The classifier sees recent steps, reasoning, and the pending call once (as `pending_call`)."""
 
-    def test_pending_call_and_lagging_copy_not_sent(self):
+    def test_pending_call_sent_once(self):
         steps = [{"reasoning": "I need the place where uploads are retried."},
                  {"tool": "Read", "input": "{}", "result": "x"},
                  {"tool": "Grep", "input": '{"pattern": "retry"}'}]  # lagging copy of the pending call
-        state = gh.classifier_state("Fix upload retries", steps, "Grep")
+        state = gh.classifier_state("Fix upload retries", steps, "Grep", {"pattern": "retry"})
         self.assertEqual(state["user_prompt"], "Fix upload retries")
         self.assertEqual(state["recent_steps"], steps[:2])
-        self.assertNotIn("retry\"", json.dumps(state))
+        self.assertEqual(state["pending_call"], {"tool": "Grep", "input": '{"pattern": "retry"}'})
 
     def test_far_prompt_dropped_earlier_reasoning_kept(self):
         steps = [{"reasoning": "plan A"}, {"reasoning": "plan B"}]
         steps += [{"tool": "Read", "input": str(i), "result": "r"} for i in range(gh.RECENT_STEPS + 2)]
         steps += [{"reasoning": "now find where tokens are refreshed"}]
-        state = gh.classifier_state("old prompt", steps, "Grep")
+        state = gh.classifier_state("old prompt", steps, "Grep", {})
         self.assertNotIn("user_prompt", state)
         self.assertEqual(state["earlier_reasoning"], ["plan A", "plan B"])
         self.assertEqual(sum("tool" in st for st in state["recent_steps"]), gh.RECENT_STEPS)
         self.assertEqual(state["recent_steps"][-1], {"reasoning": "now find where tokens are refreshed"})
+
+
+class HaikuClassifierTest(unittest.TestCase):
+    """The Messages API request offers the allowed nodes as an enum; the reply selects one, with a reason."""
+
+    def setUp(self):
+        self.requests, self.reply = [], {}
+        test = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                test.requests.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                body = json.dumps(test.reply).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.saved = gh.ANTHROPIC_BASE_URL, os.environ.get("GUIDANCE_ANTHROPIC_API_KEY")
+        gh.ANTHROPIC_BASE_URL = f"http://127.0.0.1:{self.server.server_port}"
+        os.environ["GUIDANCE_ANTHROPIC_API_KEY"] = "test-key"
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        gh.ANTHROPIC_BASE_URL = self.saved[0]
+        if self.saved[1] is None:
+            os.environ.pop("GUIDANCE_ANTHROPIC_API_KEY", None)
+        else:
+            os.environ["GUIDANCE_ANTHROPIC_API_KEY"] = self.saved[1]
+
+    def route(self, **tool_input):
+        self.reply = {"model": "claude-haiku-5-5", "stop_reason": "tool_use",
+                      "usage": {"input_tokens": 900, "output_tokens": 40},
+                      "content": [{"type": "tool_use", "name": "route", "input": tool_input}]}
+
+    def test_selects_node_with_reason(self):
+        self.route(reason="The agent greps a class named in the issue.", node=gh.REGULAR)
+        node, meta = gh.classify_haiku({"pending_call": {}}, gh.NODES)
+        self.assertEqual(node, gh.REGULAR)
+        self.assertEqual(meta["reason"], "The agent greps a class named in the issue.")
+        self.assertEqual(meta["usage"], {"input_tokens": 900, "output_tokens": 40})
+        schema = self.requests[0]["tools"][0]["input_schema"]
+        self.assertEqual(schema["required"], ["reason", "node"])
+        self.assertEqual(schema["properties"]["node"]["enum"], list(gh.NODES))
+
+    def test_capped_explorer_is_not_offered(self):
+        self.route(reason="r", node=gh.JBCONTEXT)
+        gh.classify_haiku({}, gh.allowed_nodes(gh.MAX_EXPLORER_RUNS))
+        request = self.requests[0]
+        self.assertEqual(request["tools"][0]["input_schema"]["properties"]["node"]["enum"], [gh.REGULAR, gh.JBCONTEXT])
+        self.assertNotIn('<option name="context-explorer">', request["system"])
+        self.assertIn("context-explorer has already run", request["system"])
+
+    def test_selection_outside_options_fails(self):
+        self.route(reason="r", node=gh.EXPLORER)
+        with self.assertRaises(RuntimeError):
+            gh.classify_haiku({}, [gh.REGULAR, gh.JBCONTEXT])
+
+
+class LogDirTest(unittest.TestCase):
+    def test_next_to_transcript_unless_overridden(self):
+        saved = os.environ.pop("GUIDANCE_LOG_DIR", None)
+        try:
+            self.assertEqual(gh.log_dir("/h/.claude/projects/-repo/1234.jsonl"), Path("/h/.claude/projects/-repo/guidance"))
+            os.environ["GUIDANCE_LOG_DIR"] = "/var/guidance-logs"
+            self.assertEqual(gh.log_dir("/h/.claude/projects/-repo/1234.jsonl"), Path("/var/guidance-logs"))
+        finally:
+            os.environ.pop("GUIDANCE_LOG_DIR", None)
+            if saved is not None:
+                os.environ["GUIDANCE_LOG_DIR"] = saved
 
 
 class FlowTest(unittest.TestCase):
@@ -108,32 +167,29 @@ class FlowTest(unittest.TestCase):
                     "GUIDANCE_LOG_DIR": str(root / "logs"), "TYPESAFE_API_KEY": "", "ANTHROPIC_API_KEY": "", "ANTHROPIC_AUTH_TOKEN": "",
                     "GUIDANCE_ANTHROPIC_API_KEY": "", "GUIDANCE_ANTHROPIC_BASE_URL": "http://127.0.0.1:9/never",
                     "GUIDANCE_JEV_URL": "http://127.0.0.1:9/never"}
-        for name in ("GUIDANCE_DISABLED", "GUIDANCE_FAKE_PROBS"):
+        for name in ("GUIDANCE_DISABLED", "GUIDANCE_FAKE_NODE"):
             self.env.pop(name, None)
-        self.log = root / "logs" / "s1.jsonl"
+        self.log = root / "logs" / "s1.log"
 
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_hook(self, mode, probs=None, **data):
+    def run_hook(self, mode, node=None, **data):
         env = dict(self.env)
-        if probs is not None:
-            env["GUIDANCE_FAKE_PROBS"] = json.dumps(probs)
+        if node is not None:
+            env["GUIDANCE_FAKE_NODE"] = node
         payload = {"session_id": "s1", "transcript_path": str(self.transcript), "cwd": "/repo", **data}
         out = subprocess.run([sys.executable, str(SCRIPT), mode], input=json.dumps(payload),
                              capture_output=True, text=True, env=env, check=True)
         return json.loads(out.stdout)["hookSpecificOutput"] if out.stdout.strip() else None
 
-    def pre(self, tool, probs=None, **tool_input):
-        return self.run_hook("pre", probs, tool_name=tool, tool_input=tool_input)
+    def pre(self, tool, node=None, **tool_input):
+        return self.run_hook("pre", node, tool_name=tool, tool_input=tool_input)
 
     def events(self):
         return [json.loads(l)["event"] for l in self.log.read_text().splitlines()] if self.log.exists() else []
 
-    JB = {"regular-search": 0.1, "jbcontext-search": 0.8, "context-explorer": 0.1}
-    REG = {"regular-search": 0.8, "jbcontext-search": 0.15, "context-explorer": 0.05}
-    EXP = {"regular-search": 0.02, "jbcontext-search": 0.18, "context-explorer": 0.8}
-    UNSURE = {"regular-search": 0.3, "jbcontext-search": 0.6, "context-explorer": 0.1}
+    JB, REG, EXP = gh.JBCONTEXT, gh.REGULAR, gh.EXPLORER
 
     def test_mismatch_deny_once_then_noncompliant(self):
         out = self.pre("Grep", self.JB, pattern="retry")
@@ -158,28 +214,10 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(out["permissionDecision"], "deny")
         self.assertEqual(self.events(), ["classify", "allow", "episode_end", "classify", "deny"])
 
-    def test_prefilter_and_reads_skip_classifier(self):
+    def test_reads_skip_classifier_exact_search_classified(self):
         self.assertIsNone(self.pre("Read", self.JB, file_path="src/a.py"))
-        self.assertIsNone(self.pre("Grep", self.JB, pattern="x", path="src/auth/Login.kt"))
-        self.assertEqual(self.events(), ["skip"])
-
-    def test_established_name_skips_classifier(self):
-        # "UploadRetryPolicy" appears in a tool result, so grepping it is an exact search
-        rows = [{"type": "user", "message": {"content": "Fix upload retries"}},
-                {"type": "assistant", "message": {"content": [
-                    {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "a.kt"}}]}},
-                {"type": "user", "message": {"content": [
-                    {"type": "tool_result", "tool_use_id": "t1", "content": "val p = UploadRetryPolicy()"}]}}]
-        self.transcript.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
-        self.assertIsNone(self.pre("Grep", self.JB, pattern="class UploadRetryPolicy"))
-        self.assertIsNone(self.pre("Bash", self.JB, command="rg -n 'UploadRetryPolicy' ."))
-        # a name the agent made up is not established: classified and denied
-        out = self.pre("Grep", self.JB, pattern="RetryCoordinator")
-        self.assertEqual(out["permissionDecision"], "deny")
-        self.assertEqual(self.events(), ["skip", "skip", "classify", "deny"])
-
-    def test_low_confidence_allows(self):
-        self.assertIsNone(self.pre("Grep", self.UNSURE, pattern="retry"))
+        # no pre-filter: a narrow, exact grep goes to the classifier, which allows it as regular search
+        self.assertIsNone(self.pre("Grep", self.REG, pattern="x", path="src/auth/Login.kt"))
         self.assertEqual(self.events(), ["classify", "allow"])
 
     def test_explore_builtin_is_regular_intent(self):
@@ -196,12 +234,15 @@ class FlowTest(unittest.TestCase):
         post = self.run_hook("post", tool_name="Agent", tool_input={"subagent_type": "context-explorer"},
                              tool_response={})
         self.assertIn("explorer's report", post["additionalContext"])
-        # explorer cap: a new explorer spawn is denied; a win for explorer goes to the next node
+        # explorer cap: a new explorer spawn is denied, and the explorer is no longer an option
         out = self.pre("Agent", self.EXP, subagent_type="context-explorer", prompt="map again")
         self.assertEqual(out["permissionDecision"], "deny")
-        out = self.pre("Grep", self.EXP, pattern="upload")
+        out = self.pre("Grep", self.JB, pattern="upload")
         self.assertEqual(out["permissionDecision"], "deny")
         self.assertIn("jbcontext search", out["permissionDecisionReason"])
+        self.pre("Edit", file_path="a.py")
+        self.assertIsNone(self.pre("Grep", self.EXP, pattern="upload"))  # not an option: fail open
+        self.assertEqual(self.events()[-1], "classifier_error")
 
     def test_subagent_calls_not_routed(self):
         out = self.run_hook("pre", self.JB, tool_name="Grep", tool_input={"pattern": "x"},

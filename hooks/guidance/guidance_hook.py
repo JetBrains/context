@@ -8,8 +8,8 @@ Entry points (one per hook event):
 
 Routing unit is an exploration episode: a run of consecutive exploration calls
 that ends with a non-exploration call (edit, test, build). The first routable
-call of an episode is classified (Jev); the decision is reused for the rest of
-the episode. See guidance/README.md for the node definitions and decision rules.
+call of an episode is classified (the classifier selects one node); the decision
+is reused for the rest of the episode. See guidance/README.md for the node definitions and decision rules.
 
 Any failure allows the pending call (fail open). Requires Python 3.8+, stdlib only.
 """
@@ -34,7 +34,7 @@ HOME = Path.home()
 GUIDANCE_DIR = Path(os.environ.get("GUIDANCE_DIR") or Path(__file__).resolve().parents[2] / "guidance")
 NODES_DIR = GUIDANCE_DIR / "search-call"
 STATE_DIR = Path(os.environ.get("GUIDANCE_STATE_DIR") or HOME / ".claude" / "guidance" / "state")
-LOG_DIR = Path(os.environ.get("GUIDANCE_LOG_DIR") or HOME / ".claude" / "guidance" / "logs")
+LOG_DIR = HOME / ".claude" / "guidance" / "logs"  # set per hook run by main(), see log_dir()
 JEV_URL = os.environ.get("GUIDANCE_JEV_URL", "https://api.typesafe.ai/v1/systemone")
 JEV_MODEL = os.environ.get("GUIDANCE_JEV_MODEL", "jev-latest")
 JEV_TIMEOUT = float(os.environ.get("GUIDANCE_JEV_TIMEOUT", "10"))
@@ -45,7 +45,6 @@ ANTHROPIC_BASE_URL = (os.environ.get("GUIDANCE_ANTHROPIC_BASE_URL") or os.enviro
                       or "https://api.anthropic.com").rstrip("/")
 MAX_EXPLORER_RUNS = int(os.environ.get("GUIDANCE_MAX_EXPLORER_RUNS", "1"))
 RECENT_STEPS = int(os.environ.get("GUIDANCE_RECENT_STEPS", "10"))
-DENY_MIN_PROB = float(os.environ.get("GUIDANCE_DENY_MIN_PROB", "0.75"))
 
 DENY_PREFIX = ("[search guidance] A different search method fits this step better. "
                "This is guidance, not an error.\n\n")
@@ -79,8 +78,6 @@ GIT_READ_SUBS = {"log", "show", "diff", "blame", "status", "ls-files", "ls-tree"
 JBCONTEXT_BINS = {"jbcontext", "jbcontext-eap", "embark", "embark-eap"}
 SEPARATORS = {"|", "||", "&&", ";", "&", "|&", ";;"}
 REDIRECTS = {">", ">>", "<", "<<", ">&", "&>", "&>>", "<&", ">|"}
-META_PREFIXES = ("/tmp", "/var/", "/private/", "~", "build/", "out/", "target/", "node_modules/",
-                 ".git/", ".gradle/", "dist/", ".venv/")
 
 
 def is_jbcontext_mcp(tool):
@@ -197,167 +194,6 @@ def categorize(tool, tool_input):
 NODE_OF_CATEGORY = {"regular": REGULAR, "jbcontext": JBCONTEXT, "explorer": EXPLORER}
 
 # ---------------------------------------------------------------------------
-# Pre-filter: regular-search calls that are clearly exact or meta are allowed
-# without the classifier.
-# ---------------------------------------------------------------------------
-
-
-def is_meta_path(path):
-    p = path.strip().strip("'\"")
-    return p.startswith(META_PREFIXES) or p.endswith(".log") or "/build/" in p or "/node_modules/" in p
-
-
-def is_narrow_path(path, cwd=""):
-    p = path.strip().strip("'\"")
-    if not p or p in (".", "./", "..", "*", "**") or any(c in p for c in "*?["):
-        return False
-    if cwd and p.rstrip("/") == cwd.rstrip("/"):
-        return False
-    rel = p[len(cwd):].lstrip("/") if cwd and p.startswith(cwd) else p
-    segments = [s for s in rel.split("/") if s and s != "."]
-    return len(segments) >= 2 or "." in (segments[-1] if segments else "")
-
-
-def search_paths(tokens):
-    """Path arguments of a grep-family / find / fd stage (best effort)."""
-    exe = os.path.basename(tokens[0])
-    args, skip_next, has_e = [], False, False
-    for tok in tokens[1:]:
-        if skip_next:
-            skip_next = False
-            continue
-        if tok in ("-e", "--regexp", "-f", "--file", "-g", "--glob", "-t", "--type", "-m", "--max-count",
-                   "-A", "-B", "-C", "--include", "--exclude", "-name", "-iname", "-path", "-type"):
-            has_e = has_e or tok in ("-e", "--regexp", "-f", "--file")
-            skip_next = True
-            continue
-        if tok.startswith("-"):
-            continue
-        args.append(tok)
-    if exe in ("find", "locate"):
-        return args[:1]
-    return args if has_e else args[1:]
-
-
-def prefilter_allows(tool, tool_input, cwd):
-    if tool == "Grep":
-        path = str(tool_input.get("path") or "")
-        return bool(path) and (is_meta_path(path) or is_narrow_path(path, cwd))
-    if tool == "Bash":
-        try:
-            stages = split_stages(str(tool_input.get("command", "")))
-        except ValueError:
-            return False
-        searches = [t for t, after_pipe in stages if not after_pipe and t and os.path.basename(t[0]) in SEARCH_BINS]
-        if not searches:
-            return False
-        for tokens in searches:
-            paths = search_paths(tokens)
-            if not paths or not all(is_meta_path(p) or is_narrow_path(p, cwd) for p in paths):
-                return False
-        return True
-    return False
-
-VALUE_FLAGS = {"-g", "--glob", "--iglob", "-t", "--type", "-T", "--type-not", "-m", "--max-count", "-A", "-B",
-               "-C", "--include", "--exclude", "-e", "--regexp", "-f", "--file", "--max-depth"}
-GENERIC_WORDS = {"class", "interface", "object", "enum", "fun", "def", "import", "val", "var", "status", "error",
-                 "config", "event", "events", "test", "tests", "string", "true", "false"}
-IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{3,}")
-ANCHOR_SHAPE_RE = re.compile(r"[a-z][A-Z]|_|[A-Z]{2,}|\d")
-
-
-def search_patterns(tool, tool_input):
-    """The patterns a regular search looks for (not its paths)."""
-    if tool == "Grep":
-        return [str(tool_input.get("pattern", ""))]
-    if tool != "Bash":
-        return []
-    try:
-        stages = split_stages(str(tool_input.get("command", "")))
-    except ValueError:
-        return []
-    patterns = []
-    for tokens, after_pipe in stages:
-        exe = os.path.basename(tokens[0]) if tokens else ""
-        if after_pipe or not (exe in SEARCH_BINS or (exe == "git" and "grep" in tokens[1:3])):
-            continue
-        rest = tokens[2:] if exe == "git" else tokens[1:]
-        if exe in ("find", "fd", "fdfind", "locate"):
-            patterns += [rest[i + 1] for i, t in enumerate(rest[:-1]) if t in ("-name", "-iname", "-path")]
-            if exe != "find":
-                patterns += [t for t in rest if not t.startswith("-")][:1]
-            continue
-        e_values = [rest[i + 1] for i, t in enumerate(rest[:-1]) if t in ("-e", "--regexp")]
-        plain, skip = [], False
-        for tok in rest:
-            if skip:
-                skip = False
-            elif tok in VALUE_FLAGS:
-                skip = True
-            elif not tok.startswith("-"):
-                plain.append(tok)
-        patterns += e_values or plain[:1]
-    return patterns
-
-
-def anchor_tokens(pattern):
-    """Identifier-shaped tokens (CamelCase, snake_case, SCREAMING_CASE, with digits); plain words are not anchors."""
-    out = []
-    for tok in IDENT_RE.findall(pattern):
-        if tok.lower() in GENERIC_WORDS:
-            continue
-        if ANCHOR_SHAPE_RE.search(tok) or (tok[0].isupper() and len(tok) > 4):
-            out.append(tok)
-    return out
-
-
-def established_text(path):
-    """User prompts and tool results of the session: where names get established.
-
-    The agent's own reasoning and tool inputs are excluded, so a guessed name does not confirm itself.
-    """
-    chunks = []
-    try:
-        lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
-        return ""
-    for line in lines:
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
-        if entry.get("isSidechain") or entry.get("type") != "user":
-            continue
-        content = entry.get("message", {}).get("content")
-        if isinstance(content, str):
-            chunks.append(content)
-            continue
-        for c in content if isinstance(content, list) else []:
-            if not isinstance(c, dict):
-                continue
-            if c.get("type") == "text":
-                chunks.append(c.get("text", ""))
-            elif c.get("type") == "tool_result":
-                result = c.get("content")
-                chunks.append(result if isinstance(result, str) else content_text(result))
-    return "\n".join(chunks)
-
-
-def normalize(text):
-    return re.sub(r"[^a-z0-9]", "", text.lower())
-
-
-def established_anchors(tool, tool_input, transcript_path):
-    """Anchors of the pending regular search that the user or the session already established."""
-    tokens = [t for p in search_patterns(tool, tool_input) for t in anchor_tokens(p)]
-    if not tokens:
-        return []
-    text = established_text(transcript_path)
-    flat = normalize(text)
-    return [t for t in tokens if t in text or normalize(t) in flat]
-
-
-# ---------------------------------------------------------------------------
 # State (per session, main agent only), with file lock + atomic write
 # ---------------------------------------------------------------------------
 
@@ -397,11 +233,23 @@ class StateLock:
         self.lock_file.close()
 
 
+def log_dir(transcript_path):
+    """GUIDANCE_LOG_DIR, else a `guidance/` dir next to the session transcript (eval harnesses archive
+    the transcript's folder, so the log comes back with it), else ~/.claude/guidance/logs."""
+    if os.environ.get("GUIDANCE_LOG_DIR"):
+        return Path(os.environ["GUIDANCE_LOG_DIR"])
+    if transcript_path:
+        return Path(transcript_path).absolute().parent / "guidance"
+    return HOME / ".claude" / "guidance" / "logs"
+
+
 def log_event(session_id, event):
+    """One event line in `<log dir>/<session>.log` (JSON lines; not `.jsonl`, which trajectory fetchers
+    read as a session)."""
     try:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         event = {"ts": round(time.time(), 3), "session_id": session_id, **event}
-        with open(LOG_DIR / f"{safe_id(session_id)}.jsonl", "a") as f:
+        with open(LOG_DIR / f"{safe_id(session_id)}.log", "a") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
     except OSError:
         pass
@@ -471,12 +319,13 @@ def read_transcript(path):
     return clip(task, 3000), steps
 
 
-def classifier_state(task, steps, tool):
-    """Classifier input: recent steps and the agent's latest reasoning, so the classifier sees the intent.
+def classifier_state(task, steps, tool, tool_input):
+    """Classifier input: recent steps, the agent's latest reasoning and the pending call.
 
-    The pending call itself (tool and arguments) is never sent: the classifier should judge what the
-    agent needs, not ratify what it already chose. The user prompt is included only while it is
-    recent (within the last RECENT_STEPS tool calls).
+    The pending call shows whether the agent's target is already exact (a known name or a narrow
+    path); the instructions tell the classifier to judge the target, not to ratify the agent's choice
+    of tool. The user prompt is included only while it is recent (within the last RECENT_STEPS tool
+    calls).
     """
     steps = list(steps)
     if steps and steps[-1].get("tool") == tool and "result" not in steps[-1]:
@@ -490,12 +339,18 @@ def classifier_state(task, steps, tool):
     if earlier:
         state["earlier_reasoning"] = [step["reasoning"] for step in earlier]
     state["recent_steps"] = steps[start:]
+    state["pending_call"] = {"tool": tool, "input": clip(tool_input, 400)}
     return state
 
 
-def node_descriptions():
+def allowed_nodes(explorer_runs):
+    """The nodes the classifier may select: context-explorer drops out once it has run its cap."""
+    return [n for n in NODES if n != EXPLORER or explorer_runs < MAX_EXPLORER_RUNS]
+
+
+def node_descriptions(nodes=NODES):
     out = {}
-    for node in NODES:
+    for node in nodes:
         text = (NODES_DIR / node / "description.md").read_text(encoding="utf-8")
         out[node] = "\n".join(l for l in text.splitlines() if not l.startswith("# Node:")).strip()
     return out
@@ -519,30 +374,35 @@ def jev_key():
 
 CLASSIFIER_INSTRUCTIONS = (
     "The state shows a coding agent's recent steps and reasoning (and the user's request "
-    "when it is recent). The agent is about to search the codebase for something; its "
-    "next tool call is deliberately not shown. From its reasoning and what the session "
-    "already established, judge what it intends to find next, and which search approach "
-    "fits that intent. In the option descriptions, the pending call means this next search.")
+    "when it is recent), and the search call it is about to make (pending_call). From its "
+    "reasoning and what the session already established, judge what it intends to find, and "
+    "select the one search approach that fits that intent. Judge the target, not the agent's "
+    "choice of tool: a call that looks for a name, path, or literal the user gave or the "
+    "session already established, or that looks inside a file already located, is exact; a "
+    "name the agent guesses for something it can only describe is not.")
 
 
-def classify(state_payload):
-    """(probs, meta): {node: probability}, and what to log about the call ({} for a fake classifier).
+def classify(state_payload, options):
+    """(node, meta): the selected node out of `options`, and what to log about the call ({} for a fake).
 
     Raises on any failure (caller fails open).
     """
-    fake = os.environ.get("GUIDANCE_FAKE_PROBS")
+    fake = os.environ.get("GUIDANCE_FAKE_NODE")
     if fake:
-        return {k: float(v) for k, v in json.loads(fake).items()}, {}
+        if fake not in options:
+            raise ValueError(f"fake node {fake} is not an option")
+        return fake, {}
     if CLASSIFIER == "jev":
-        return classify_jev(state_payload)
-    return classify_haiku(state_payload)
+        return classify_jev(state_payload, options)
+    return classify_haiku(state_payload, options)
 
 
-def classify_haiku(state_payload):
-    """Claude Haiku over the Messages API: one forced `route` tool call returning a probability per node.
+def classify_haiku(state_payload, options):
+    """Claude Haiku over the Messages API: one forced `route` tool call selecting a node, with a reason.
 
-    The call is made by the hook, not the agent, so it is not part of the agent's own usage; its
-    token usage is returned for the log so the classifier cost can be reported separately.
+    The reason comes first so the selection follows from it. The call is made by the hook, not the
+    agent, so it is not part of the agent's own usage; its token usage is returned for the log so the
+    classifier cost can be reported separately.
     """
     key = os.environ.get("GUIDANCE_ANTHROPIC_API_KEY", "").strip() or os.environ.get("ANTHROPIC_API_KEY", "").strip()
     token = os.environ.get("ANTHROPIC_AUTH_TOKEN", "").strip()
@@ -552,22 +412,25 @@ def classify_haiku(state_payload):
         auth = {"Authorization": f"Bearer {token}"}
     else:
         raise RuntimeError("no Anthropic credentials (GUIDANCE_ANTHROPIC_API_KEY, ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN)")
-    options = "\n\n".join(f'<option name="{node}">\n{text}\n</option>' for node, text in node_descriptions().items())
+    described = "\n\n".join(f'<option name="{node}">\n{text}\n</option>' for node, text in node_descriptions(options).items())
+    capped = "" if EXPLORER in options else f"\n\n{EXPLORER} has already run for this task and is not an option."
     payload = {
         "model": ANTHROPIC_MODEL,
         "max_tokens": 1024,
         "output_config": {"effort": "low"},
-        "system": (f"{CLASSIFIER_INSTRUCTIONS}\n\nThe search approaches:\n\n{options}\n\n"
-                   "Call the route tool once, with a probability between 0 and 1 for every approach; "
-                   "the probabilities should sum to 1."),
+        "system": (f"{CLASSIFIER_INSTRUCTIONS}\n\nThe search approaches:\n\n{described}{capped}\n\n"
+                   "Call the route tool once: a one-sentence reason, then the approach that fits."),
         "tools": [{
             "name": "route",
-            "description": "Report how likely each search approach fits the agent's next search.",
+            "description": "Select the search approach that fits the agent's next search.",
             "strict": True,
             "input_schema": {
                 "type": "object",
-                "properties": {node: {"type": "number"} for node in NODES},
-                "required": list(NODES),
+                "properties": {
+                    "reason": {"type": "string", "description": "One sentence: what the agent needs and why this approach fits."},
+                    "node": {"type": "string", "enum": list(options)},
+                },
+                "required": ["reason", "node"],
                 "additionalProperties": False,
             },
         }],
@@ -587,18 +450,18 @@ def classify_haiku(state_payload):
     call = next((c for c in result.get("content", []) if c.get("type") == "tool_use" and c.get("name") == "route"), None)
     if call is None:
         raise RuntimeError(f"no route call (stop_reason {result.get('stop_reason')})")
-    raw = {node: max(0.0, float(call["input"].get(node, 0.0))) for node in NODES}
-    total = sum(raw.values())
-    if total <= 0:
-        raise RuntimeError("route call returned no probability mass")
+    node = call["input"].get("node")
+    if node not in options:
+        raise RuntimeError(f"route call selected no option ({str(node)[:60]})")
     usage = result.get("usage") or {}
     meta = {"classifier": "haiku", "model": result.get("model", ANTHROPIC_MODEL),
+            "reason": clip(str(call["input"].get("reason", "")), 400),
             "usage": {k: usage[k] for k in ("input_tokens", "output_tokens") if k in usage}}
-    return {node: raw[node] / total for node in NODES}, meta
+    return node, meta
 
 
-def classify_jev(state_payload):
-    """Jev `choice` question over the node descriptions (the original classifier)."""
+def classify_jev(state_payload, options):
+    """Jev `choice` question over the node descriptions (the original classifier): its most probable option."""
     key = jev_key()
     if not key:
         raise RuntimeError("no Jev API key (TYPESAFE_API_KEY or ~/.config/jev/api-key)")
@@ -609,7 +472,7 @@ def classify_jev(state_payload):
             "route": {
                 "type": "choice",
                 "instructions": CLASSIFIER_INSTRUCTIONS,
-                "criteria": node_descriptions(),
+                "criteria": node_descriptions(options),
             }
         },
     }
@@ -622,17 +485,8 @@ def classify_jev(state_payload):
     except urllib.error.HTTPError as error:
         raise RuntimeError(f"Jev HTTP {error.code}") from None
     probs = result["answers"]["route"]["probabilities"]
-    return {node: float(probs.get(node, 0.0)) for node in NODES}, {"classifier": "jev"}
-
-
-def pick_winner(probs, explorer_runs):
-    """(winner, confidence): argmax over the allowed nodes, and its probability renormalized over them."""
-    candidates = {n: p for n, p in probs.items() if n in NODES}
-    if explorer_runs >= MAX_EXPLORER_RUNS:
-        candidates.pop(EXPLORER, None)
-    winner = max(candidates, key=candidates.get)
-    total = sum(candidates.values())
-    return winner, (candidates[winner] / total if total > 0 else 0.0)
+    probs = {node: float(probs.get(node, 0.0)) for node in options}
+    return max(options, key=probs.get), {"classifier": "jev", "probs": probs}
 
 # ---------------------------------------------------------------------------
 # Hook outputs
@@ -685,22 +539,11 @@ def handle_pre(data):
         episode = state["episode"]
         if episode is None:
             state["episode_seq"] += 1
-            episode = state["episode"] = {"id": state["episode_seq"], "decision": None, "probs": None,
-                                          "followed": False, "denied": False, "guided": False}
+            episode = state["episode"] = {"id": state["episode_seq"], "decision": None, "followed": False,
+                                          "denied": False, "guided": False}
         if category == "read":
             lock.save()
             return
-        if category == "regular":
-            # An exact search is justified by itself: a narrow/meta path, or a name the user or the
-            # session already established. No classifier, no deny.
-            skip = "path" if prefilter_allows(tool, tool_input, data.get("cwd", "")) else None
-            if skip is None:
-                anchors = established_anchors(tool, tool_input, data.get("transcript_path", ""))
-                skip = f"established:{','.join(anchors[:3])}" if anchors else None
-            if skip:
-                log_event(session_id, {"event": "skip", "episode": episode["id"], "tool": tool, "reason": skip})
-                lock.save()
-                return
         pending = NODE_OF_CATEGORY[category]
 
         if pending == EXPLORER and state["explorer_runs"] >= MAX_EXPLORER_RUNS:
@@ -715,13 +558,11 @@ def handle_pre(data):
             task, recent = read_transcript(data.get("transcript_path", ""))
             started = time.time()
             try:
-                probs, meta = classify(classifier_state(task, recent, tool))
-                episode["probs"] = probs
-                episode["decision"], episode["confidence"] = pick_winner(probs, state["explorer_runs"])
+                episode["decision"], meta = classify(classifier_state(task, recent, tool, tool_input),
+                                                     allowed_nodes(state["explorer_runs"]))
                 state["counters"]["classifications"] += 1
                 log_event(session_id, {"event": "classify", "episode": episode["id"], "tool": tool,
-                                       "pending_node": pending, "probs": probs, "decision": episode["decision"],
-                                       "confidence": round(episode["confidence"], 3),
+                                       "pending_node": pending, "decision": episode["decision"],
                                        "latency_ms": int((time.time() - started) * 1000), **meta})
             except Exception as error:  # fail open for the whole episode
                 episode["decision"] = "none"
@@ -751,13 +592,6 @@ def handle_pre(data):
             # (e.g. grep on a name the semantic search returned).
             log_event(session_id, {"event": "allow", "episode": episode["id"], "tool": tool,
                                    "node": pending, "follow_up_of": decision})
-            lock.save()
-            allow(tool, tool_input, force_foreground=(pending == EXPLORER))
-            return
-        confidence = episode.get("confidence", 0.0)
-        if confidence < DENY_MIN_PROB:
-            log_event(session_id, {"event": "allow", "episode": episode["id"], "tool": tool, "node": pending,
-                                   "low_confidence": round(confidence, 3), "decision": decision})
             lock.save()
             allow(tool, tool_input, force_foreground=(pending == EXPLORER))
             return
@@ -816,8 +650,11 @@ def main():
     handler = {"pre": handle_pre, "post": handle_post, "prompt": handle_prompt}.get(sys.argv[1])
     if handler is None:
         return 0
+    global LOG_DIR
     try:
-        handler(json.load(sys.stdin))
+        data = json.load(sys.stdin)
+        LOG_DIR = log_dir(str(data.get("transcript_path") or ""))
+        handler(data)
     except Exception as error:  # fail open: never block the agent because of the router
         print(f"guidance hook error: {error}", file=sys.stderr)
     return 0

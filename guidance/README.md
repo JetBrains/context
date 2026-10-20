@@ -34,28 +34,25 @@ Multi-repo search is a future node. (Not planned during hackathon)
 
 ## Decision
 
-A regular search that is exact by itself - a narrow or meta path, or a
-search for a name the user or the session already established - is allowed
-without the classifier.
+Every routable call that starts an exploration episode goes to the
+classifier; there is no rule-based shortcut. The classifier gets the session
+context, the agent's recent reasoning and the pending call, and selects one
+node: `regular-search`, `jbcontext-search` or `context-explorer`, with a
+one-sentence reason. It judges the target, not the agent's choice of tool: a
+search for a name, path, or literal the user gave or the session already
+established is exact, so it selects `regular-search`.
 
-Otherwise the classifier gets the session context and the agent's recent
-reasoning, but not the pending call, and returns a probability for each node:
-`regular-search`, `jbcontext-search`, `context-explorer`. The most probable
-node wins (argmax).
-
-- If the winning node is the one the pending call already uses, proceed and do
-  not deny the tool call.
-- If the winner is not confident (below 0.75 among the nodes still allowed),
-  also proceed.
-- Otherwise deny the pending call and give the winning node's guidance as the
+- If the selected node is the one the pending call already uses, proceed and
+  do not deny the tool call.
+- Otherwise deny the pending call and give the selected node's guidance as the
   reason: for `jbcontext-search` its `instruction.md` / `instruction-mcp.md`,
   for `context-explorer` its `instruction.md`, for `regular-search` a short
   note to use Grep / Glob / Read on the exact name or path.
 - The explorer can be reached both ways: a pending `context-explorer` spawn can
   be redirected to a search, and a pending search can be redirected to the
   explorer.
-- At most one `context-explorer` run per task. Once it has run, a win for
-  `context-explorer` goes to the more probable of the other two nodes.
+- At most one `context-explorer` run per task. Once it has run, it is no
+  longer offered to the classifier.
 - An allowed `context-explorer` spawn always runs in the foreground
   (`run_in_background` forced to false), and its `result-instruction.md` is
   attached to its result.

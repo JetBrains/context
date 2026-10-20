@@ -26,47 +26,38 @@ node's guidance at the moment of the call. Node definitions and decision rules:
    - `context-explorer`: the `context-explorer` subagent.
 
    Reads (`Read`, `Glob`, `cat`, `sed`, `ls`, `git log`, pipe filters like `cmd | grep x`) are never routed.
-3. **Pre-filter.** A regular search is allowed without the classifier, and is
-   never denied, when it is an exact search by itself:
-   - **Narrow or meta path:** every path is a file or a directory with 2+
-     segments, or a meta location (`/tmp`, `build/`, `*.log`, ...).
-   - **Established name:** an identifier in the search pattern (CamelCase,
-     snake_case, SCREAMING_CASE, with digits; plain words like `retry` do not
-     count) already appears in the session's user prompts or tool results
-     (files read, search output, explorer reports). Matching ignores case and
-     `_`/`-`. The agent's own reasoning and tool inputs do not count, so a
-     guessed name does not confirm itself.
+3. **Classify once per episode.** The first routable call of an episode asks
+   the classifier (Claude Haiku by default, or Jev) to select one of the
+   `description.md` files; there is no rule-based pre-filter. The state comes
+   from `transcript_path`: the last `GUIDANCE_RECENT_STEPS` tool calls with
+   their results, the agent's reasoning between them (visible text, and
+   thinking text when the transcript keeps it), the two reasoning entries just
+   before that window, and the user prompt while it is within the window. The
+   pending call (tool and arguments, from stdin) is sent once, as
+   `pending_call`; a lagging transcript copy of it is dropped from the steps.
+   The instructions tell the classifier to judge the target rather than ratify
+   the agent's choice of tool: a search for a name, path, or literal that the
+   user gave or the session established is exact (`regular-search`).
+   - **Haiku** answers with one forced `route` tool call, `{reason, node}`,
+     where `node` is an enum of the allowed nodes; the reason comes first.
+   - **Jev** answers with probabilities; its most probable allowed node is taken.
 
-   This applies to every regular search, also after the episode has a decision.
-   Only the pattern is used here; it is never sent to the classifier.
-4. **Classify once per episode.** The first routable call that passes the
-   pre-filter asks the classifier (Claude Haiku by default, or Jev) to pick one of the three
-   `description.md` files. The state comes from `transcript_path`: the last
-   `GUIDANCE_RECENT_STEPS` tool calls with their results, the agent's reasoning
-   between them (visible text, and thinking text when the transcript keeps it),
-   the two reasoning entries just before that window, and the user prompt while
-   it is within the window. The pending call itself (tool and arguments, from
-   stdin) is not sent, so the classifier judges the agent's intent instead of
-   ratifying its choice; a lagging transcript copy of the pending call is
-   dropped for the same reason. The argmax wins. The decision is reused for the
-   rest of the episode.
-5. **Compare** the winning node with the pending call:
+   The decision is reused for the rest of the episode.
+4. **Compare** the selected node with the pending call:
    - Match: allow. For `jbcontext-search` the first matching call also gets
      `instruction.md` (or `instruction-mcp.md`) as `additionalContext`.
-   - Mismatch, but the winner's confidence (its probability renormalized over
-     the nodes still allowed) is below `GUIDANCE_DENY_MIN_PROB`: allow.
    - Mismatch, decision not yet followed in this episode: deny once, with the
-     winning node's guidance as the reason.
+     selected node's guidance as the reason.
    - Mismatch after that deny: allow and log `noncompliant`.
    - Mismatch after the decision was already followed: allow (follow-up, e.g.
      grep on a name that semantic search returned).
-6. **Explorer.** An allowed `context-explorer` spawn is forced to the
+5. **Explorer.** An allowed `context-explorer` spawn is forced to the
    foreground (`run_in_background: false`). At most
    `GUIDANCE_MAX_EXPLORER_RUNS` (default 1) runs per task; after that the
-   explorer is dropped from the argmax and new spawns are denied.
+   explorer is no longer offered to the classifier and new spawns are denied.
 
-Fail open: a missing key, network error, timeout, bad response, or any
-exception allows the call. A classifier failure leaves the whole episode unrouted.
+Fail open: a missing key, network error, timeout, bad response (including a
+node outside the options), or any exception allows the call. A classifier failure leaves the whole episode unrouted.
 
 Not routed inside subagents: when the hook input has `agent_id`/`agent_type`,
 the call goes through untouched.
@@ -90,7 +81,7 @@ This writes three entries into `settings.json`:
 - `UserPromptSubmit` -> `jbcontext hook user-prompt-submit --mode guidance`
 
 The CLI port reads the same `GUIDANCE_*` variables (table below). Its default state
-and log dirs are `~/.jbcontext/guidance/{state,logs}`. `GUIDANCE_DISABLED=1` turns an
+dir is `~/.jbcontext/guidance/state`; logs go next to the transcript, as here. `GUIDANCE_DISABLED=1` turns an
 installed router off.
 
 Both implementations must pass `parity_cases.json` (see Tests).
@@ -122,7 +113,7 @@ Keep the hook `timeout` above `GUIDANCE_JEV_TIMEOUT`.
 
 | Variable | Default | |
 |---|---|---|
-| `GUIDANCE_CLASSIFIER` | `haiku` | `haiku` (Anthropic Messages API, one forced `route` tool call) or `jev` |
+| `GUIDANCE_CLASSIFIER` | `haiku` | `haiku` (Anthropic Messages API, one forced `route` tool call selecting a node) or `jev` (probabilities, most probable taken) |
 | `GUIDANCE_ANTHROPIC_API_KEY` | - | Haiku key; falls back to `ANTHROPIC_API_KEY`, then `ANTHROPIC_AUTH_TOKEN` (Bearer). In an eval pod these are the agent's own credentials |
 | `GUIDANCE_ANTHROPIC_BASE_URL` | `ANTHROPIC_BASE_URL`, else `https://api.anthropic.com` | |
 | `GUIDANCE_ANTHROPIC_MODEL` | `claude-haiku-5-5` | |
@@ -132,24 +123,25 @@ Keep the hook `timeout` above `GUIDANCE_JEV_TIMEOUT`.
 | `GUIDANCE_JEV_URL` | `https://api.typesafe.ai/v1/systemone` | |
 | `GUIDANCE_JEV_TIMEOUT` | `10` | seconds |
 | `GUIDANCE_MAX_EXPLORER_RUNS` | `1` | per task |
-| `GUIDANCE_DENY_MIN_PROB` | `0.75` | minimum winner confidence to deny a mismatching call |
 | `GUIDANCE_RECENT_STEPS` | `10` | tool calls (plus the reasoning between them) sent to the classifier |
 | `GUIDANCE_DIR` | `<repo>/guidance` | node files |
 | `GUIDANCE_STATE_DIR` | `~/.claude/guidance/state` | per-session state + lock |
-| `GUIDANCE_LOG_DIR` | `~/.claude/guidance/logs` | per-session JSONL log |
+| `GUIDANCE_LOG_DIR` | `guidance/` next to the session transcript, else `~/.claude/guidance/logs` | per-session log (JSON lines) |
 | `GUIDANCE_DISABLED` | - | `1` turns the router off |
-| `GUIDANCE_FAKE_PROBS` | - | JSON `{node: p}` instead of calling the classifier (tests, dry runs) |
+| `GUIDANCE_FAKE_NODE` | - | node the classifier "selects" instead of calling it (tests, dry runs); a node outside the options fails like a bad response |
 
 The jbcontext guidance uses `instruction-mcp.md` once the session has made an
 `mcp__jbcontext*` call, `instruction.md` (CLI) otherwise.
 
 ## Log
 
-`<GUIDANCE_LOG_DIR>/<session_id>.jsonl`, one event per line:
-`skip` (pre-filter: `path` or `established:<names>`), `classify` (probabilities,
-decision, confidence, latency; for a live call also `classifier`, `model` and token `usage`), `classifier_error`, `allow` (with `low_confidence`
-when below the threshold),
-`deny`, `noncompliant`, `episode_end`, `explorer_done`, `prompt_reset`
+`<log dir>/<session_id>.log`, one JSON event per line. By default the log dir is
+`guidance/` next to the session transcript (`~/.claude/projects/<project>/guidance/`),
+so eval harnesses that archive the transcripts bring the log back with them; the
+extension is `.log` because trajectory fetchers read every `*.jsonl` there as a
+session. Events:
+`classify` (decision and latency; for a live call also `classifier`, `model`,
+token `usage`, and the Haiku `reason` or the Jev `probs`), `classifier_error`, `allow`, `deny`, `noncompliant`, `episode_end`, `explorer_done`, `prompt_reset`
 (with per-task counters: classifications, classifier_errors, denies, noncompliant).
 
 ## Tests
@@ -165,8 +157,8 @@ Haiku or Jev.
 
 `parity_cases.json` holds the inputs and outputs that both implementations replay:
 - flows of hook calls with their outputs and log events;
-- tables for the pure functions (categorize, pre-filter, paths, patterns, anchors,
-  transcript reading, classifier state, winner).
+- tables for the pure functions (categorize, transcript reading, classifier
+  state, allowed nodes).
 
 The inputs live in `parity_cases.py`; the expected values are recorded from this script.
 

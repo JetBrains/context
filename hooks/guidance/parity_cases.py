@@ -30,22 +30,12 @@ DEFAULT_TRANSCRIPT = [{"type": "user", "message": {"role": "user", "content": "W
 # Log fields that vary between runs or implementations; not part of the contract.
 VOLATILE_EVENT_FIELDS = ("ts", "session_id", "latency_ms", "error")
 
-JB = {"regular-search": 0.1, "jbcontext-search": 0.8, "context-explorer": 0.1}
-REG = {"regular-search": 0.8, "jbcontext-search": 0.15, "context-explorer": 0.05}
-EXP = {"regular-search": 0.02, "jbcontext-search": 0.18, "context-explorer": 0.8}
-UNSURE = {"regular-search": 0.3, "jbcontext-search": 0.6, "context-explorer": 0.1}
-
-ESTABLISHED_TRANSCRIPT = [
-    {"type": "user", "message": {"content": "Fix upload retries"}},
-    {"type": "assistant", "message": {"content": [
-        {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "a.kt"}}]}},
-    {"type": "user", "message": {"content": [
-        {"type": "tool_result", "tool_use_id": "t1", "content": "val p = UploadRetryPolicy()"}]}},
-]
+JB, REG, EXP = gh.JBCONTEXT, gh.REGULAR, gh.EXPLORER
 
 
-def pre(tool, probs=None, **tool_input):
-    return {"mode": "pre", "tool_name": tool, "tool_input": tool_input, "probs": probs}
+def pre(tool, node=None, **tool_input):
+    """`node`: what the fake classifier selects (GUIDANCE_FAKE_NODE); None makes the classifier fail."""
+    return {"mode": "pre", "tool_name": tool, "tool_input": tool_input, "node": node}
 
 
 # ---------------------------------------------------------------------------
@@ -70,17 +60,10 @@ FLOWS = [
         pre("Grep", REG, pattern="retry"),
         pre("Bash", command="./gradlew test | grep FAIL"),
         pre("Grep", JB, pattern="retry")]},
-    {"name": "prefilter_and_reads_skip_classifier", "steps": [
+    {"name": "reads_skip_classifier_exact_search_classified", "steps": [
         pre("Read", JB, file_path="src/a.py"),
-        pre("Grep", JB, pattern="x", path="src/auth/Login.kt"),
-        pre("Bash", JB, command="rg -n foo src/auth"),
-        pre("Bash", JB, command="find build/reports -name '*.xml'")]},
-    {"name": "established_name_skips_classifier", "transcript": ESTABLISHED_TRANSCRIPT, "steps": [
-        pre("Grep", JB, pattern="class UploadRetryPolicy"),
-        pre("Bash", JB, command="rg -n 'UploadRetryPolicy' ."),
-        pre("Grep", JB, pattern="RetryCoordinator")]},
-    {"name": "low_confidence_allows", "steps": [
-        pre("Grep", UNSURE, pattern="retry")]},
+        pre("Grep", REG, pattern="x", path="src/auth/Login.kt"),
+        pre("Bash", REG, command="rg -n foo src/auth")]},
     {"name": "neutral_tools_ignored", "steps": [
         pre("TodoWrite", JB, todos=[]),
         pre("Bash", JB, command="echo hi"),
@@ -94,6 +77,8 @@ FLOWS = [
         {"mode": "post", "tool_name": "Agent", "tool_input": {"subagent_type": "context-explorer"},
          "tool_response": {}},
         pre("Agent", EXP, subagent_type="context-explorer", prompt="map again"),
+        pre("Grep", JB, pattern="upload"),
+        pre("Edit", file_path="a.py"),
         pre("Grep", EXP, pattern="upload")]},
     {"name": "explorer_redirected_to_jbcontext", "steps": [
         pre("Agent", JB, subagent_type="context-explorer", prompt="where are retries")]},
@@ -103,7 +88,7 @@ FLOWS = [
         {"mode": "post", "tool_name": "Agent", "tool_input": {"subagent_type": "general-purpose"},
          "tool_response": {}}]},
     {"name": "subagent_calls_not_routed", "steps": [
-        {"mode": "pre", "tool_name": "Grep", "tool_input": {"pattern": "x"}, "probs": JB,
+        {"mode": "pre", "tool_name": "Grep", "tool_input": {"pattern": "x"}, "node": JB,
          "agent_id": "a1", "agent_type": "context-explorer"}]},
     {"name": "classifier_error_fails_open_for_episode", "steps": [
         pre("Grep", None, pattern="retry"),
@@ -137,37 +122,6 @@ CATEGORIZE = [
     "python3 - <<'EOF'\nprint(1)\nEOF", "rg foo > /tmp/out.txt", "(cd src && grep -rn x .)", "unterminated 'quote",
     "embark search query", "git -C repo grep foo", "ls | grep x", "fd Login src",
 ]]
-
-PREFILTER = [
-    ("Grep", {"pattern": "x", "path": "src/auth/Login.kt"}), ("Grep", {"pattern": "x", "path": "src/auth"}),
-    ("Grep", {"pattern": "x", "path": "/tmp/out.log"}), ("Grep", {"pattern": "x"}), ("Grep", {"pattern": "x", "path": "/repo"}),
-    ("Grep", {"pattern": "x", "path": "src"}), ("Grep", {"pattern": "x", "path": "/repo/src/main"}),
-    ("Grep", {"pattern": "x", "path": "build/x"}), ("Grep", {"pattern": "x", "path": "src/*.kt"}),
-] + [("Bash", {"command": c}) for c in [
-    "rg -n foo src/auth", "grep -rn foo src/auth/Login.kt 2>/dev/null", "rg -e foo -e bar src/main/kotlin",
-    "rg -n 'retry'", "rg -n retry .", "find . -name '*.kt'", "find build/reports -name '*.xml'",
-    "grep -rn foo /repo", "rg foo src/a src/b/c.kt", "rg foo src/a src", "cat x | grep y", "rg -g '*.kt' foo src/main",
-    "grep -n foo README.md", "rg --type kotlin foo app/src",
-]]
-
-NARROW_PATHS = [(p, c) for p in ["src/auth", "src", ".", "./", "..", "*", "src/*.kt", "a.py", "/repo", "/repo/src",
-                                  "/repo/src/main", "'src/x'", "", "src/"] for c in ["/repo", ""]]
-META_PATHS = ["/tmp/x", "/var/log/a", "~/x", "build/out", "a/build/b", "x.log", "src/a", "node_modules/a", "./src"]
-
-PATTERNS = [
-    ("Grep", {"pattern": "class UploadRetryPolicy"}),
-    ("Bash", {"command": "rg -n 'UploadRetryPolicy' ."}),
-    ("Bash", {"command": "grep -rn -e foo -e Bar_baz src"}),
-    ("Bash", {"command": "find . -name 'Login*.kt' -path '*auth*'"}),
-    ("Bash", {"command": "fd LoginService src"}),
-    ("Bash", {"command": "git grep -n processRequest"}),
-    ("Bash", {"command": "rg -g '*.kt' -t kotlin MAX_RETRIES src"}),
-    ("Bash", {"command": "cat a | grep Foo"}),
-    ("Read", {"file_path": "a"}),
-]
-ANCHOR_PATTERNS = ["class UploadRetryPolicy", "retry", "MAX_RETRIES", "upload_retry", "fooBar", "Uploader",
-                   "Upload", "http2Client", "config|event", "processRequest(", "a.b.c", "Status", "INFO",
-                   "X", "getHTTPResponse"]
 
 TRANSCRIPTS = [
     ("basic", [
@@ -207,16 +161,16 @@ CLASSIFIER_STATES = [
     ("pending_call_and_lagging_copy_not_sent", "Fix upload retries", [
         {"reasoning": "I need the place where uploads are retried."},
         {"tool": "Read", "input": "{}", "result": "x"},
-        {"tool": "Grep", "input": "{\"pattern\": \"retry\"}"}], "Grep"),
+        {"tool": "Grep", "input": "{\"pattern\": \"retry\"}"}], "Grep", {"pattern": "retry"}),
     ("far_prompt_dropped_earlier_reasoning_kept", "old prompt",
      [{"reasoning": "plan A"}, {"reasoning": "plan B"}]
      + [{"tool": "Read", "input": str(i), "result": "r"} for i in range(gh.RECENT_STEPS + 2)]
-     + [{"reasoning": "now find where tokens are refreshed"}], "Grep"),
-    ("short_session_keeps_prompt", "Fix it", [{"tool": "Grep", "input": "{}", "result": "r"}], "Bash"),
+     + [{"reasoning": "now find where tokens are refreshed"}], "Grep", {"pattern": "TokenRefresher", "path": "src"}),
+    ("short_session_keeps_prompt", "Fix it", [{"tool": "Grep", "input": "{}", "result": "r"}], "Bash",
+     {"command": "rg -n " + "x" * 450}),
 ]
 
-PICK_WINNER = [(JB, 0), (EXP, 0), (EXP, 1), (UNSURE, 0), ({"regular-search": 0.0, "jbcontext-search": 0.0,
-                                                           "context-explorer": 0.0}, 0)]
+ALLOWED_NODES = list(range(gh.MAX_EXPLORER_RUNS + 2))
 
 
 # ---------------------------------------------------------------------------
@@ -233,16 +187,16 @@ def run_flow(flow):
                "GUIDANCE_LOG_DIR": str(root / "logs"), "TYPESAFE_API_KEY": "", "ANTHROPIC_API_KEY": "", "ANTHROPIC_AUTH_TOKEN": "",
                     "GUIDANCE_ANTHROPIC_API_KEY": "", "GUIDANCE_ANTHROPIC_BASE_URL": "http://127.0.0.1:9/never",
                "GUIDANCE_JEV_URL": "http://127.0.0.1:9/never", **flow.get("env", {})}
-        for name in ("GUIDANCE_FAKE_PROBS",) + (() if "GUIDANCE_DISABLED" in flow.get("env", {}) else ("GUIDANCE_DISABLED",)):
+        for name in ("GUIDANCE_FAKE_NODE",) + (() if "GUIDANCE_DISABLED" in flow.get("env", {}) else ("GUIDANCE_DISABLED",)):
             env.pop(name, None)
-        log = root / "logs" / f"{SESSION}.jsonl"
+        log = root / "logs" / f"{SESSION}.log"
         recorded = []
         for step in flow["steps"]:
             step_env = dict(env)
-            if step.get("probs") is not None:
-                step_env["GUIDANCE_FAKE_PROBS"] = json.dumps(step["probs"])
+            if step.get("node") is not None:
+                step_env["GUIDANCE_FAKE_NODE"] = step["node"]
             payload = {"session_id": SESSION, "transcript_path": str(transcript), "cwd": CWD}
-            payload.update({k: v for k, v in step.items() if k not in ("mode", "probs")})
+            payload.update({k: v for k, v in step.items() if k not in ("mode", "node")})
             before = len(log.read_text().splitlines()) if log.exists() else 0
             out = subprocess.run([sys.executable, str(SCRIPT), step["mode"]], input=json.dumps(payload),
                                  capture_output=True, text=True, env=step_env, check=True)
@@ -265,22 +219,16 @@ def build():
         "cwd": CWD,
         "default_transcript": DEFAULT_TRANSCRIPT,
         "volatile_event_fields": list(VOLATILE_EVENT_FIELDS),
-        "constants": {"recent_steps": gh.RECENT_STEPS, "deny_min_prob": gh.DENY_MIN_PROB,
-                      "max_explorer_runs": gh.MAX_EXPLORER_RUNS},
+        "constants": {"recent_steps": gh.RECENT_STEPS, "max_explorer_runs": gh.MAX_EXPLORER_RUNS},
         "flows": [run_flow(f) for f in FLOWS],
         "categorize": [{"tool": t, "input": i, "expect": gh.categorize(t, i)} for t, i in CATEGORIZE],
-        "prefilter": [{"tool": t, "input": i, "cwd": CWD, "expect": gh.prefilter_allows(t, i, CWD)} for t, i in PREFILTER],
-        "narrow_path": [{"path": p, "cwd": c, "expect": gh.is_narrow_path(p, c)} for p, c in NARROW_PATHS],
-        "meta_path": [{"path": p, "expect": gh.is_meta_path(p)} for p in META_PATHS],
-        "search_patterns": [{"tool": t, "input": i, "expect": gh.search_patterns(t, i)} for t, i in PATTERNS],
-        "anchor_tokens": [{"pattern": p, "expect": gh.anchor_tokens(p)} for p in ANCHOR_PATTERNS],
         "read_transcript": [{"name": n, "rows": rows, "trailer": trailer,
                              "expect": dict(zip(("task", "steps"), read(rows, trailer)))}
                             for n, rows, trailer in TRANSCRIPTS],
-        "classifier_state": [{"name": n, "task": task, "steps": steps, "tool": tool,
-                              "expect": gh.classifier_state(task, steps, tool)}
-                             for n, task, steps, tool in CLASSIFIER_STATES],
-        "pick_winner": [{"probs": p, "explorer_runs": r, "expect": list(gh.pick_winner(p, r))} for p, r in PICK_WINNER],
+        "classifier_state": [{"name": n, "task": task, "steps": steps, "tool": tool, "tool_input": tool_input,
+                              "expect": gh.classifier_state(task, steps, tool, tool_input)}
+                             for n, task, steps, tool, tool_input in CLASSIFIER_STATES],
+        "allowed_nodes": [{"explorer_runs": r, "expect": gh.allowed_nodes(r)} for r in ALLOWED_NODES],
     }
 
 

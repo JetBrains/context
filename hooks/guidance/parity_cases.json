@@ -19,7 +19,6 @@
  ],
  "constants": {
   "recent_steps": 10,
-  "deny_min_prob": 0.75,
   "max_explorer_runs": 1
  },
  "flows": [
@@ -32,11 +31,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -51,13 +46,7 @@
         "episode": 1,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
+        "decision": "jbcontext-search"
        },
        {
         "event": "deny",
@@ -75,11 +64,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.8,
-      "jbcontext-search": 0.15,
-      "context-explorer": 0.05
-     },
+     "node": "regular-search",
      "expect": {
       "output": null,
       "events": [
@@ -104,11 +89,7 @@
      "tool_input": {
       "command": "jbcontext search \"upload retry policy\""
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -122,13 +103,7 @@
         "episode": 1,
         "tool": "Bash",
         "pending_node": "jbcontext-search",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
+        "decision": "jbcontext-search"
        },
        {
         "event": "allow",
@@ -146,11 +121,7 @@
      "tool_input": {
       "command": "jbcontext search \"other\""
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": null,
       "events": [
@@ -170,11 +141,7 @@
      "tool_input": {
       "pattern": "UploadRetryPolicy"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": null,
       "events": [
@@ -199,11 +166,7 @@
      "tool_input": {
       "text": "where upload retries are scheduled"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -217,13 +180,7 @@
         "episode": 1,
         "tool": "mcp__jbcontext__code_search",
         "pending_node": "jbcontext-search",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
+        "decision": "jbcontext-search"
        },
        {
         "event": "allow",
@@ -246,11 +203,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.8,
-      "jbcontext-search": 0.15,
-      "context-explorer": 0.05
-     },
+     "node": "regular-search",
      "expect": {
       "output": null,
       "events": [
@@ -259,13 +212,7 @@
         "episode": 1,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.8,
-         "jbcontext-search": 0.15,
-         "context-explorer": 0.05
-        },
-        "decision": "regular-search",
-        "confidence": 0.8
+        "decision": "regular-search"
        },
        {
         "event": "allow",
@@ -283,7 +230,7 @@
      "tool_input": {
       "file_path": "a.py"
      },
-     "probs": null,
+     "node": null,
      "expect": {
       "output": null,
       "events": [
@@ -292,15 +239,9 @@
         "episode": {
          "id": 1,
          "decision": "regular-search",
-         "probs": {
-          "regular-search": 0.8,
-          "jbcontext-search": 0.15,
-          "context-explorer": 0.05
-         },
          "followed": true,
          "denied": false,
-         "guided": false,
-         "confidence": 0.8
+         "guided": false
         },
         "by": "Edit"
        }
@@ -313,11 +254,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -332,13 +269,7 @@
         "episode": 2,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
+        "decision": "jbcontext-search"
        },
        {
         "event": "deny",
@@ -361,11 +292,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.8,
-      "jbcontext-search": 0.15,
-      "context-explorer": 0.05
-     },
+     "node": "regular-search",
      "expect": {
       "output": null,
       "events": [
@@ -374,13 +301,7 @@
         "episode": 1,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.8,
-         "jbcontext-search": 0.15,
-         "context-explorer": 0.05
-        },
-        "decision": "regular-search",
-        "confidence": 0.8
+        "decision": "regular-search"
        },
        {
         "event": "allow",
@@ -398,7 +319,7 @@
      "tool_input": {
       "command": "./gradlew test | grep FAIL"
      },
-     "probs": null,
+     "node": null,
      "expect": {
       "output": null,
       "events": [
@@ -407,15 +328,9 @@
         "episode": {
          "id": 1,
          "decision": "regular-search",
-         "probs": {
-          "regular-search": 0.8,
-          "jbcontext-search": 0.15,
-          "context-explorer": 0.05
-         },
          "followed": true,
          "denied": false,
-         "guided": false,
-         "confidence": 0.8
+         "guided": false
         },
         "by": "Bash"
        }
@@ -428,11 +343,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -447,13 +358,7 @@
         "episode": 2,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
+        "decision": "jbcontext-search"
        },
        {
         "event": "deny",
@@ -468,7 +373,7 @@
    ]
   },
   {
-   "name": "prefilter_and_reads_skip_classifier",
+   "name": "reads_skip_classifier_exact_search_classified",
    "steps": [
     {
      "mode": "pre",
@@ -476,11 +381,7 @@
      "tool_input": {
       "file_path": "src/a.py"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": null,
       "events": []
@@ -493,19 +394,23 @@
       "pattern": "x",
       "path": "src/auth/Login.kt"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "regular-search",
      "expect": {
       "output": null,
       "events": [
        {
-        "event": "skip",
+        "event": "classify",
         "episode": 1,
         "tool": "Grep",
-        "reason": "path"
+        "pending_node": "regular-search",
+        "decision": "regular-search"
+       },
+       {
+        "event": "allow",
+        "episode": 1,
+        "tool": "Grep",
+        "node": "regular-search",
+        "first_follow": true
        }
       ]
      }
@@ -516,214 +421,16 @@
      "tool_input": {
       "command": "rg -n foo src/auth"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "regular-search",
      "expect": {
       "output": null,
       "events": [
-       {
-        "event": "skip",
-        "episode": 1,
-        "tool": "Bash",
-        "reason": "path"
-       }
-      ]
-     }
-    },
-    {
-     "mode": "pre",
-     "tool_name": "Bash",
-     "tool_input": {
-      "command": "find build/reports -name '*.xml'"
-     },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
-     "expect": {
-      "output": null,
-      "events": [
-       {
-        "event": "skip",
-        "episode": 1,
-        "tool": "Bash",
-        "reason": "path"
-       }
-      ]
-     }
-    }
-   ]
-  },
-  {
-   "name": "established_name_skips_classifier",
-   "transcript": [
-    {
-     "type": "user",
-     "message": {
-      "content": "Fix upload retries"
-     }
-    },
-    {
-     "type": "assistant",
-     "message": {
-      "content": [
-       {
-        "type": "tool_use",
-        "id": "t1",
-        "name": "Read",
-        "input": {
-         "file_path": "a.kt"
-        }
-       }
-      ]
-     }
-    },
-    {
-     "type": "user",
-     "message": {
-      "content": [
-       {
-        "type": "tool_result",
-        "tool_use_id": "t1",
-        "content": "val p = UploadRetryPolicy()"
-       }
-      ]
-     }
-    }
-   ],
-   "steps": [
-    {
-     "mode": "pre",
-     "tool_name": "Grep",
-     "tool_input": {
-      "pattern": "class UploadRetryPolicy"
-     },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
-     "expect": {
-      "output": null,
-      "events": [
-       {
-        "event": "skip",
-        "episode": 1,
-        "tool": "Grep",
-        "reason": "established:UploadRetryPolicy"
-       }
-      ]
-     }
-    },
-    {
-     "mode": "pre",
-     "tool_name": "Bash",
-     "tool_input": {
-      "command": "rg -n 'UploadRetryPolicy' ."
-     },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
-     "expect": {
-      "output": null,
-      "events": [
-       {
-        "event": "skip",
-        "episode": 1,
-        "tool": "Bash",
-        "reason": "established:UploadRetryPolicy"
-       }
-      ]
-     }
-    },
-    {
-     "mode": "pre",
-     "tool_name": "Grep",
-     "tool_input": {
-      "pattern": "RetryCoordinator"
-     },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
-     "expect": {
-      "output": {
-       "hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
-        "permissionDecisionReason": "[search guidance] A different search method fits this step better. This is guidance, not an error.\n\n# Guidance: jbcontext search (CLI)\n\nWhat you are looking for is described by meaning, not by an exact name.\nFind it with semantic search instead of guessing grep patterns.\n\n## Call\n\n```bash\njbcontext search \"<query>\"\njbcontext search -p <path> \"<query>\"   # narrow to a directory or file\njbcontext search \"<code snippet>\"      # find similar code\n```\n\nUse `--limit <n>` to change the number of results. Do not pipe the output\nthrough `head`.\n\n## Query\n\n- Write one sentence that describes a single concept or intent. Name the\n  behavior or pattern, the domain terms from the task, and the kind of code\n  you expect (handler, validator, config, test).\n  - Good: \"function that validates user email addresses and returns boolean\"\n  - Good: \"where the outbound HTTP request timeout is configured\"\n  - Good: \"tests that exercise lambda-parameter indentation handling\"\n- Avoid single words (\"email\", \"error\"), bare declarations (\"class User\"),\n  and keyword bags (\"product composite REST controller service reviews openapi tests\").\n- One concept per query. If you need two different things, run two queries\n  instead of combining them.\n- To find code similar to a piece you already have, pass a short\n  representative snippet as the query.\n\n## Path filter (`-p`)\n\n- Use it only when you have evidence for the directory or file, e.g. the\n  directory of a relevant earlier hit.\n- Relative to the project root: `src/auth`, `services/payments`, `app/models/user.py`.\n- Never absolute paths, leading slashes, `.`, `./`, `*`, or globs.\n- Omit it to search the whole project.\n\n## After the results\n\nResults are ranked file paths with code snippets and line numbers.\n\n1. Read the most relevant returned files.\n2. If a hit is relevant but incomplete, inspect neighboring files in the same\n   directory before searching again.\n3. Continue with Read and grep on the exact names you found.\n4. If you still need semantic search, retry narrowed with\n   `-p <directory of the best hit>`, or rephrase the query. Do not repeat the\n   same query.\n\n## Caveats\n\n- The index may lag uncommitted local edits. Use grep and Read for files\n  changed in this session.\n- Results are the most relevant matches, not all occurrences. To find every\n  usage of a name, use grep."
-       }
-      },
-      "events": [
-       {
-        "event": "classify",
-        "episode": 1,
-        "tool": "Grep",
-        "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
-       },
-       {
-        "event": "deny",
-        "episode": 1,
-        "tool": "Grep",
-        "pending_node": "regular-search",
-        "decision": "jbcontext-search"
-       }
-      ]
-     }
-    }
-   ]
-  },
-  {
-   "name": "low_confidence_allows",
-   "steps": [
-    {
-     "mode": "pre",
-     "tool_name": "Grep",
-     "tool_input": {
-      "pattern": "retry"
-     },
-     "probs": {
-      "regular-search": 0.3,
-      "jbcontext-search": 0.6,
-      "context-explorer": 0.1
-     },
-     "expect": {
-      "output": null,
-      "events": [
-       {
-        "event": "classify",
-        "episode": 1,
-        "tool": "Grep",
-        "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.3,
-         "jbcontext-search": 0.6,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.6
-       },
        {
         "event": "allow",
         "episode": 1,
-        "tool": "Grep",
+        "tool": "Bash",
         "node": "regular-search",
-        "low_confidence": 0.6,
-        "decision": "jbcontext-search"
+        "first_follow": false
        }
       ]
      }
@@ -739,11 +446,7 @@
      "tool_input": {
       "todos": []
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": null,
       "events": []
@@ -755,11 +458,7 @@
      "tool_input": {
       "command": "echo hi"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": null,
       "events": []
@@ -772,11 +471,7 @@
       "subagent_type": "general-purpose",
       "prompt": "do x"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": null,
       "events": []
@@ -794,11 +489,7 @@
       "subagent_type": "Explore",
       "prompt": "find X"
      },
-     "probs": {
-      "regular-search": 0.8,
-      "jbcontext-search": 0.15,
-      "context-explorer": 0.05
-     },
+     "node": "regular-search",
      "expect": {
       "output": null,
       "events": [
@@ -807,13 +498,7 @@
         "episode": 1,
         "tool": "Agent",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.8,
-         "jbcontext-search": 0.15,
-         "context-explorer": 0.05
-        },
-        "decision": "regular-search",
-        "confidence": 0.8
+        "decision": "regular-search"
        },
        {
         "event": "allow",
@@ -831,7 +516,7 @@
      "tool_input": {
       "file_path": "a.py"
      },
-     "probs": null,
+     "node": null,
      "expect": {
       "output": null,
       "events": [
@@ -840,15 +525,9 @@
         "episode": {
          "id": 1,
          "decision": "regular-search",
-         "probs": {
-          "regular-search": 0.8,
-          "jbcontext-search": 0.15,
-          "context-explorer": 0.05
-         },
          "followed": true,
          "denied": false,
-         "guided": false,
-         "confidence": 0.8
+         "guided": false
         },
         "by": "Edit"
        }
@@ -862,11 +541,7 @@
       "subagent_type": "Explore",
       "prompt": "map the upload flow"
      },
-     "probs": {
-      "regular-search": 0.02,
-      "jbcontext-search": 0.18,
-      "context-explorer": 0.8
-     },
+     "node": "context-explorer",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -881,13 +556,7 @@
         "episode": 2,
         "tool": "Agent",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.02,
-         "jbcontext-search": 0.18,
-         "context-explorer": 0.8
-        },
-        "decision": "context-explorer",
-        "confidence": 0.8
+        "decision": "context-explorer"
        },
        {
         "event": "deny",
@@ -912,11 +581,7 @@
       "prompt": "map",
       "run_in_background": true
      },
-     "probs": {
-      "regular-search": 0.02,
-      "jbcontext-search": 0.18,
-      "context-explorer": 0.8
-     },
+     "node": "context-explorer",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -935,13 +600,7 @@
         "episode": 1,
         "tool": "Agent",
         "pending_node": "context-explorer",
-        "probs": {
-         "regular-search": 0.02,
-         "jbcontext-search": 0.18,
-         "context-explorer": 0.8
-        },
-        "decision": "context-explorer",
-        "confidence": 0.8
+        "decision": "context-explorer"
        },
        {
         "event": "allow",
@@ -974,15 +633,9 @@
         "episode": {
          "id": 1,
          "decision": "context-explorer",
-         "probs": {
-          "regular-search": 0.02,
-          "jbcontext-search": 0.18,
-          "context-explorer": 0.8
-         },
          "followed": true,
          "denied": false,
-         "guided": false,
-         "confidence": 0.8
+         "guided": false
         }
        }
       ]
@@ -995,11 +648,7 @@
       "subagent_type": "context-explorer",
       "prompt": "map again"
      },
-     "probs": {
-      "regular-search": 0.02,
-      "jbcontext-search": 0.18,
-      "context-explorer": 0.8
-     },
+     "node": "context-explorer",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -1024,11 +673,7 @@
      "tool_input": {
       "pattern": "upload"
      },
-     "probs": {
-      "regular-search": 0.02,
-      "jbcontext-search": 0.18,
-      "context-explorer": 0.8
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -1043,13 +688,7 @@
         "episode": 2,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.02,
-         "jbcontext-search": 0.18,
-         "context-explorer": 0.8
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.9
+        "decision": "jbcontext-search"
        },
        {
         "event": "deny",
@@ -1057,6 +696,47 @@
         "tool": "Grep",
         "pending_node": "regular-search",
         "decision": "jbcontext-search"
+       }
+      ]
+     }
+    },
+    {
+     "mode": "pre",
+     "tool_name": "Edit",
+     "tool_input": {
+      "file_path": "a.py"
+     },
+     "node": null,
+     "expect": {
+      "output": null,
+      "events": [
+       {
+        "event": "episode_end",
+        "episode": {
+         "id": 2,
+         "decision": "jbcontext-search",
+         "followed": false,
+         "denied": true,
+         "guided": false
+        },
+        "by": "Edit"
+       }
+      ]
+     }
+    },
+    {
+     "mode": "pre",
+     "tool_name": "Grep",
+     "tool_input": {
+      "pattern": "upload"
+     },
+     "node": "context-explorer",
+     "expect": {
+      "output": null,
+      "events": [
+       {
+        "event": "classifier_error",
+        "episode": 3
        }
       ]
      }
@@ -1073,11 +753,7 @@
       "subagent_type": "context-explorer",
       "prompt": "where are retries"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -1092,13 +768,7 @@
         "episode": 1,
         "tool": "Agent",
         "pending_node": "context-explorer",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
+        "decision": "jbcontext-search"
        },
        {
         "event": "deny",
@@ -1121,11 +791,7 @@
      "tool_input": {
       "pattern": "upload"
      },
-     "probs": {
-      "regular-search": 0.02,
-      "jbcontext-search": 0.18,
-      "context-explorer": 0.8
-     },
+     "node": "context-explorer",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -1140,13 +806,7 @@
         "episode": 1,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.02,
-         "jbcontext-search": 0.18,
-         "context-explorer": 0.8
-        },
-        "decision": "context-explorer",
-        "confidence": 0.8
+        "decision": "context-explorer"
        },
        {
         "event": "deny",
@@ -1186,11 +846,7 @@
      "tool_input": {
       "pattern": "x"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "agent_id": "a1",
      "agent_type": "context-explorer",
      "expect": {
@@ -1209,7 +865,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": null,
+     "node": null,
      "expect": {
       "output": null,
       "events": [
@@ -1226,7 +882,7 @@
      "tool_input": {
       "command": "jbcontext search x"
      },
-     "probs": null,
+     "node": null,
      "expect": {
       "output": null,
       "events": []
@@ -1243,11 +899,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.8,
-      "jbcontext-search": 0.15,
-      "context-explorer": 0.05
-     },
+     "node": "regular-search",
      "expect": {
       "output": null,
       "events": [
@@ -1256,13 +908,7 @@
         "episode": 1,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.8,
-         "jbcontext-search": 0.15,
-         "context-explorer": 0.05
-        },
-        "decision": "regular-search",
-        "confidence": 0.8
+        "decision": "regular-search"
        },
        {
         "event": "allow",
@@ -1299,11 +945,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": {
        "hookSpecificOutput": {
@@ -1318,13 +960,7 @@
         "episode": 2,
         "tool": "Grep",
         "pending_node": "regular-search",
-        "probs": {
-         "regular-search": 0.1,
-         "jbcontext-search": 0.8,
-         "context-explorer": 0.1
-        },
-        "decision": "jbcontext-search",
-        "confidence": 0.8
+        "decision": "jbcontext-search"
        },
        {
         "event": "deny",
@@ -1350,11 +986,7 @@
      "tool_input": {
       "pattern": "retry"
      },
-     "probs": {
-      "regular-search": 0.1,
-      "jbcontext-search": 0.8,
-      "context-explorer": 0.1
-     },
+     "node": "jbcontext-search",
      "expect": {
       "output": null,
       "events": []
@@ -1690,543 +1322,6 @@
    "expect": "regular"
   }
  ],
- "prefilter": [
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "src/auth/Login.kt"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "src/auth"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "/tmp/out.log"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "/repo"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "src"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "/repo/src/main"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "build/x"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "x",
-    "path": "src/*.kt"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg -n foo src/auth"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "grep -rn foo src/auth/Login.kt 2>/dev/null"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg -e foo -e bar src/main/kotlin"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg -n 'retry'"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg -n retry ."
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "find . -name '*.kt'"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "find build/reports -name '*.xml'"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "grep -rn foo /repo"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg foo src/a src/b/c.kt"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg foo src/a src"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "cat x | grep y"
-   },
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg -g '*.kt' foo src/main"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "grep -n foo README.md"
-   },
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg --type kotlin foo app/src"
-   },
-   "cwd": "/repo",
-   "expect": true
-  }
- ],
- "narrow_path": [
-  {
-   "path": "src/auth",
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "path": "src/auth",
-   "cwd": "",
-   "expect": true
-  },
-  {
-   "path": "src",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "src",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": ".",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": ".",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": "./",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "./",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": "..",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "..",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": "*",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "*",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": "src/*.kt",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "src/*.kt",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": "a.py",
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "path": "a.py",
-   "cwd": "",
-   "expect": true
-  },
-  {
-   "path": "/repo",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "/repo",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": "/repo/src",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "/repo/src",
-   "cwd": "",
-   "expect": true
-  },
-  {
-   "path": "/repo/src/main",
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "path": "/repo/src/main",
-   "cwd": "",
-   "expect": true
-  },
-  {
-   "path": "'src/x'",
-   "cwd": "/repo",
-   "expect": true
-  },
-  {
-   "path": "'src/x'",
-   "cwd": "",
-   "expect": true
-  },
-  {
-   "path": "",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "",
-   "cwd": "",
-   "expect": false
-  },
-  {
-   "path": "src/",
-   "cwd": "/repo",
-   "expect": false
-  },
-  {
-   "path": "src/",
-   "cwd": "",
-   "expect": false
-  }
- ],
- "meta_path": [
-  {
-   "path": "/tmp/x",
-   "expect": true
-  },
-  {
-   "path": "/var/log/a",
-   "expect": true
-  },
-  {
-   "path": "~/x",
-   "expect": true
-  },
-  {
-   "path": "build/out",
-   "expect": true
-  },
-  {
-   "path": "a/build/b",
-   "expect": true
-  },
-  {
-   "path": "x.log",
-   "expect": true
-  },
-  {
-   "path": "src/a",
-   "expect": false
-  },
-  {
-   "path": "node_modules/a",
-   "expect": true
-  },
-  {
-   "path": "./src",
-   "expect": false
-  }
- ],
- "search_patterns": [
-  {
-   "tool": "Grep",
-   "input": {
-    "pattern": "class UploadRetryPolicy"
-   },
-   "expect": [
-    "class UploadRetryPolicy"
-   ]
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg -n 'UploadRetryPolicy' ."
-   },
-   "expect": [
-    "UploadRetryPolicy"
-   ]
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "grep -rn -e foo -e Bar_baz src"
-   },
-   "expect": [
-    "foo",
-    "Bar_baz"
-   ]
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "find . -name 'Login*.kt' -path '*auth*'"
-   },
-   "expect": [
-    "Login*.kt",
-    "*auth*"
-   ]
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "fd LoginService src"
-   },
-   "expect": [
-    "LoginService"
-   ]
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "git grep -n processRequest"
-   },
-   "expect": [
-    "processRequest"
-   ]
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "rg -g '*.kt' -t kotlin MAX_RETRIES src"
-   },
-   "expect": [
-    "MAX_RETRIES"
-   ]
-  },
-  {
-   "tool": "Bash",
-   "input": {
-    "command": "cat a | grep Foo"
-   },
-   "expect": []
-  },
-  {
-   "tool": "Read",
-   "input": {
-    "file_path": "a"
-   },
-   "expect": []
-  }
- ],
- "anchor_tokens": [
-  {
-   "pattern": "class UploadRetryPolicy",
-   "expect": [
-    "UploadRetryPolicy"
-   ]
-  },
-  {
-   "pattern": "retry",
-   "expect": []
-  },
-  {
-   "pattern": "MAX_RETRIES",
-   "expect": [
-    "MAX_RETRIES"
-   ]
-  },
-  {
-   "pattern": "upload_retry",
-   "expect": [
-    "upload_retry"
-   ]
-  },
-  {
-   "pattern": "fooBar",
-   "expect": [
-    "fooBar"
-   ]
-  },
-  {
-   "pattern": "Uploader",
-   "expect": [
-    "Uploader"
-   ]
-  },
-  {
-   "pattern": "Upload",
-   "expect": [
-    "Upload"
-   ]
-  },
-  {
-   "pattern": "http2Client",
-   "expect": [
-    "http2Client"
-   ]
-  },
-  {
-   "pattern": "config|event",
-   "expect": []
-  },
-  {
-   "pattern": "processRequest(",
-   "expect": [
-    "processRequest"
-   ]
-  },
-  {
-   "pattern": "a.b.c",
-   "expect": []
-  },
-  {
-   "pattern": "Status",
-   "expect": []
-  },
-  {
-   "pattern": "INFO",
-   "expect": [
-    "INFO"
-   ]
-  },
-  {
-   "pattern": "X",
-   "expect": []
-  },
-  {
-   "pattern": "getHTTPResponse",
-   "expect": [
-    "getHTTPResponse"
-   ]
-  }
- ],
  "read_transcript": [
   {
    "name": "basic",
@@ -2477,6 +1572,9 @@
     }
    ],
    "tool": "Grep",
+   "tool_input": {
+    "pattern": "retry"
+   },
    "expect": {
     "user_prompt": "Fix upload retries",
     "recent_steps": [
@@ -2488,7 +1586,11 @@
       "input": "{}",
       "result": "x"
      }
-    ]
+    ],
+    "pending_call": {
+     "tool": "Grep",
+     "input": "{\"pattern\": \"retry\"}"
+    }
    }
   },
   {
@@ -2566,6 +1668,10 @@
     }
    ],
    "tool": "Grep",
+   "tool_input": {
+    "pattern": "TokenRefresher",
+    "path": "src"
+   },
    "expect": {
     "earlier_reasoning": [
      "plan A",
@@ -2625,7 +1731,11 @@
      {
       "reasoning": "now find where tokens are refreshed"
      }
-    ]
+    ],
+    "pending_call": {
+     "tool": "Grep",
+     "input": "{\"pattern\": \"TokenRefresher\", \"path\": \"src\"}"
+    }
    }
   },
   {
@@ -2639,6 +1749,9 @@
     }
    ],
    "tool": "Bash",
+   "tool_input": {
+    "command": "rg -n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
    "expect": {
     "user_prompt": "Fix it",
     "recent_steps": [
@@ -2647,69 +1760,35 @@
       "input": "{}",
       "result": "r"
      }
-    ]
+    ],
+    "pending_call": {
+     "tool": "Bash",
+     "input": "{\"command\": \"rg -n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx... [71 more chars]"
+    }
    }
   }
  ],
- "pick_winner": [
+ "allowed_nodes": [
   {
-   "probs": {
-    "regular-search": 0.1,
-    "jbcontext-search": 0.8,
-    "context-explorer": 0.1
-   },
-   "explorer_runs": 0,
-   "expect": [
-    "jbcontext-search",
-    0.8
-   ]
-  },
-  {
-   "probs": {
-    "regular-search": 0.02,
-    "jbcontext-search": 0.18,
-    "context-explorer": 0.8
-   },
-   "explorer_runs": 0,
-   "expect": [
-    "context-explorer",
-    0.8
-   ]
-  },
-  {
-   "probs": {
-    "regular-search": 0.02,
-    "jbcontext-search": 0.18,
-    "context-explorer": 0.8
-   },
-   "explorer_runs": 1,
-   "expect": [
-    "jbcontext-search",
-    0.9
-   ]
-  },
-  {
-   "probs": {
-    "regular-search": 0.3,
-    "jbcontext-search": 0.6,
-    "context-explorer": 0.1
-   },
-   "explorer_runs": 0,
-   "expect": [
-    "jbcontext-search",
-    0.6
-   ]
-  },
-  {
-   "probs": {
-    "regular-search": 0.0,
-    "jbcontext-search": 0.0,
-    "context-explorer": 0.0
-   },
    "explorer_runs": 0,
    "expect": [
     "regular-search",
-    0.0
+    "jbcontext-search",
+    "context-explorer"
+   ]
+  },
+  {
+   "explorer_runs": 1,
+   "expect": [
+    "regular-search",
+    "jbcontext-search"
+   ]
+  },
+  {
+   "explorer_runs": 2,
+   "expect": [
+    "regular-search",
+    "jbcontext-search"
    ]
   }
  ]

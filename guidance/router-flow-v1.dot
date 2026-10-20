@@ -1,0 +1,56 @@
+// Structural-guidance router v1 (the run in structural-guidance-experiment.md): decision flow for one main-agent tool call.
+// Render: dot -Tsvg guidance/router-flow-v1.dot -o guidance/router-flow-v1.svg (and -Tpng -Gdpi=160 for PNG)
+digraph router {
+    graph [rankdir=TB, fontname="Helvetica", fontsize=12, nodesep=0.35, ranksep=0.4, pad=0.3, bgcolor="white"];
+    node  [fontname="Helvetica", fontsize=11, shape=box, style="rounded,filled", fillcolor="#f4f6f8", color="#8a96a3", margin="0.15,0.07"];
+    edge  [fontname="Helvetica", fontsize=10, color="#5c6773", fontcolor="#38424d", arrowsize=0.7];
+
+    // decisions
+    node [shape=diamond, style="filled", fillcolor="#fff7e0", color="#c9a227", margin="0.04,0.03"];
+    sub     [label="Inside a\nsubagent?"];
+    kind    [label="Call type?"];
+    pre     [label="Pre-filter:\nnarrow path, or a name\nalready in prompt/results?"];
+    decided [label="Episode already\nhas a decision?"];
+    match   [label="Winner = node of\nthe pending call?"];
+    which   [label="Which node?"];
+    conf    [label="Winner p >= 0.75,\nnot yet denied or followed\nin this episode?"];
+
+    // actions
+    node [shape=box, style="rounded,filled", margin="0.15,0.07"];
+    call    [label="Main-agent tool call\n(PreToolUse hook)", fillcolor="#e3ecf7", color="#4a78b0"];
+    classify[label="Haiku 5.5 classifier\ninput: last 10 tool calls + reasoning\n(not the pending call)\noutput: p(regular), p(jbcontext), p(explorer)", fillcolor="#e3ecf7", color="#4a78b0"];
+    winner  [label="Winner = argmax\n(explorer excluded once it has run)", fillcolor="#e3ecf7", color="#4a78b0"];
+    allow   [label="ALLOW unchanged", fillcolor="#e4f3e4", color="#4f9a4f"];
+    endep   [label="ALLOW and end the\nexploration episode", fillcolor="#e4f3e4", color="#4f9a4f"];
+    allowj  [label="ALLOW + attach\njbcontext instruction.md\n(first call only)", fillcolor="#e4f3e4", color="#4f9a4f"];
+    allowx  [label="ALLOW, force foreground;\nattach result-instruction.md\nto the explorer report", fillcolor="#e4f3e4", color="#4f9a4f"];
+    deny    [label="DENY the call\nreason = winner's guidance", fillcolor="#fbe4e4", color="#c0504d"];
+    r1      [label="-> regular-search\nuse Grep / Glob / Read\non the exact name", fillcolor="#fbe4e4", color="#c0504d"];
+    r2      [label="-> jbcontext-search\nits instruction.md\n(query and -p rules)", fillcolor="#fbe4e4", color="#c0504d"];
+    r3      [label="-> context-explorer\nspawn it with a 1-2 sentence\nintent and wait for it", fillcolor="#fbe4e4", color="#c0504d"];
+
+    call -> sub;
+    sub -> allow [label=" yes"];
+    sub -> kind  [label=" no"];
+    kind -> allow [label=" read\n (Read, Glob, cat, ls)"];
+    kind -> endep [label=" edit, test, build"];
+    kind -> pre   [label=" search\n (grep, jbcontext,\n explorer spawn)"];
+    pre -> allow  [label=" yes"];
+    pre -> decided [label=" no"];
+    decided -> classify [label=" no"];
+    decided -> winner   [label=" yes"];
+    classify -> winner;
+    classify -> allow   [label=" error /\n timeout", style=dashed];
+    winner -> match;
+    match -> which [label=" yes"];
+    match -> conf  [label=" no"];
+    which -> allow  [label=" regular"];
+    which -> allowj [label=" jbcontext"];
+    which -> allowx [label=" explorer"];
+    conf -> allow [label=" no"];
+    conf -> deny  [label=" yes"];
+    deny -> r1; deny -> r2; deny -> r3;
+
+    { rank=same; allow; endep; }
+    { rank=same; r1; r2; r3; }
+}
