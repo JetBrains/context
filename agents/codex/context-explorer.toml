@@ -68,6 +68,7 @@ Each finding must include a snippet you actually saw - either the short excerpt 
 
 - Read-only. Do not edit files or run commands that mutate state.
 - Use `jbcontext search` and file reads; reach for grep/glob only for exact-symbol lookups the intent already names.
+- Do not re-read or report files the parent says it already read; spend the budget on what is still unknown.
 - Do not read whole large files - read only the relevant region.
 - Be honest about confidence: if a hit looks plausible but you did not verify it by reading, label it lower confidence.
 - 1-3 findings total; do not pad with marginal hits. Keep the whole report to roughly 1.5K-3K tokens including snippets - the parent has its own context budget too.
