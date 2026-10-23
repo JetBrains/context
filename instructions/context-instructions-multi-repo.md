@@ -1,8 +1,7 @@
 ## Multi-Repo Search (jbcontext)
 
 Your indexed context is not limited to the current 
-checkout: `jbcontext` searches every repository you have access to, not just the current checkout. Prefer the
-`/org-search`, `/dependency-search`, and `/blast-radius` skills; the commands below are the fallback.
+checkout: `jbcontext` searches every repository you have access to, not just the current checkout.
 
 Go org-wide once the local answer is missing or insufficient - typically when the symbol, service, or
 table is defined elsewhere, when you need prior art, or when a shared contract or dependency change
