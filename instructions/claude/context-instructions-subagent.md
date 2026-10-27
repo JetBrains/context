@@ -53,9 +53,23 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 
 ### Query Tips
 
-- Be descriptive: "function that validates user email addresses" > "email"
-- Include context: "error handling middleware for HTTP requests with logging"
-- Specify what you're looking for: "React component that renders a modal dialog"
+Before searching, translate the research task into the one code responsibility you need to locate next. Describe that code in concise natural language rather than forwarding the whole assignment as the query.
+
+- Describe the operation, its subject, and the constraints that distinguish it from nearby code. Preserve useful domain terms and exact identifiers supplied by the task or observed in code; avoid keyword bags and guessed names.
+- If the task spans endpoints, persistence, configuration, callers, or tests, choose the responsibility needed first. Read the results and follow local references before searching for another responsibility that remains unresolved.
+- Keep a related precondition, return value, or failure case when it describes the same operation. Do not split a coherent behavior merely because its description contains "and".
+- Keep requests for explanations, output formatting, and a final report outside the search text.
+- For a feature that does not exist yet, search for the existing mechanism to extend rather than assuming the desired implementation already exists.
+
+Examples:
+
+- Focused: "retrieving a user's learning progress for a particular course"
+- Focused: "HTTP handlers receiving and storing uploaded IDE analytics"
+- Focused: "moving downloaded distributions atomically with a fallback when atomic moves are unsupported"
+- Too many responsibilities: "Where are course endpoints and how is user course learning progress recorded and returned?"
+- Too many responsibilities: "Find the upload endpoints, data storage, configuration, and related tests"
+
+Question phrasing is fine when it has one clear retrieval target; there is no fixed word limit.
 
 ### Single-Shot Policy
 
