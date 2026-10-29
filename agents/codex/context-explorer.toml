@@ -49,10 +49,10 @@ Report in three parts. The parent reads this as context it can use directly, so 
     - "<query 2, with -p <path>>" -> narrowed; top hits: <files>
 
     ## Findings
-    [1] <relative/path>:<line> - <one-line description of relevance>
+    [1] <repo>/<relative/path>:<line> - <one-line description of relevance>
     <10-30 line code snippet you actually saw, with line numbers if available>
 
-    [2] <relative/path>:<line> - <one-line description>
+    [2] <repo>/<relative/path>:<line> - <one-line description>
     <code snippet>
 
     ## Notes
