@@ -1,57 +1,62 @@
-# Tools
+# Repository search with jbcontext
 
-## Semantic Code Search (jbcontext)
+All repository search actions MUST use the appropriate jbcontext tool below,
+including precise follow-ups after discovery and after edits.
 
-You have access to `jbcontext search` for searching the codebase semantically.
-It finds code by meaning, not just keywords.
+Use jbcontext for every repository search: source, tests, configuration,
+documentation, filenames, and exact follow-ups in known files or directories.
+Choose the tool that matches the question; keep using jbcontext as you learn
+identifiers and after making edits.
 
-### When to use
+| Need | CLI | MCP |
+| --- | --- | --- |
+| Behavior, intent, or similar code | `jbcontext search "<focused question>"` | `code_search(text=...)` |
+| Literal text, identifier, or string occurrences | `jbcontext text-search "<literal>"` | `text_search(pattern=...)` |
+| Occurrences matching a regular expression | `jbcontext regex-search '<RE2 pattern>'` | `regex_search(pattern=...)` |
+| Declarations of classes, functions, or other symbols | `jbcontext symbol-search '^Name$'` | `symbol_search(pattern=...)` |
+| Filename or path glob | `jbcontext file-search '**/*Test.kt'` | `file_search(pattern=...)` |
 
-`jbcontext search` is a **code-discovery** tool. It applies only when a task requires finding or understanding code whose location you don't already know.
+Precise searches are local and work offline. They search the current working
+tree, including staged/unstaged edits and nonignored untracked files. An explicit
+`--revision <ref>` / MCP `revision` selects immutable committed code instead.
+This working-tree default also applies to regex and symbol search. Symbol search
+uses Ctags declarations; use literal/regex search to find usages. File globs with
+no slash match basenames; `**` spans directories. Binary files, symlinks, oversized
+contents, Git ignores for untracked files, jbcontext ignores, and workspace
+exclusions limit the searchable files.
 
-Skip it - go straight to the right tool - when:
+Scope to a known file or directory with `--path-filter <path>` (`-p`) / MCP
+`pathFilter`. Use `--ignore-case` / `caseSensitive=false` when needed. Literal
+search supports `--whole-word` / `wholeWord=true`. Precise search returns every
+occurrence in repository/path/position order, with no relevance threshold.
+Use `--limit` / `limit` and continue with `--cursor` / top-level MCP `nextCursor`
+to inspect further pages. Reuse the other search arguments. If edits invalidate
+a cursor, restart that search. Check incomplete-search and error diagnostics;
+truncation means more matches exist, not that traversal failed.
 
-- the task names the exact file, class, or symbol (keyword grep is faster);
-- the relevant file is already open or identified;
-- the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds, shell/statusline/config setup, or reviewing a diff you already have.
+For behavior discovery, describe one existing code responsibility and its
+distinguishing constraints in natural language. Preserve relevant domain terms
+and observed identifiers. Do not submit the entire task or invent symbol names.
+Inspect promising code, then use the appropriate jbcontext tool for the next
+question. There is no fixed search/retry cap or single-bootstrap rule.
 
-### MANDATORY: Always use jbcontext for code search
+Read and edit known locations using native file tools. Builds, tests, Git
+operations, and filtering command output continue normally. Do not search
+repository content with rg/grep, find, glob, or an agent's native search tool as
+a routine follow-up. If jbcontext reports an error or does not support a needed
+capability, briefly state that reason and use an external search fallback for
+that operation. Empty results alone do not establish tool failure: check scope,
+spelling, case, or the choice of search tool. Do not suppress reported errors or
+claim committed results describe uncommitted code.
 
-When code discovery *is* needed and you do not yet know the right file, subsystem, implementation, or related test, you MUST start with `jbcontext search` before planning, editing, or exact search. This mandate governs *how* you start code discovery, not whether every task needs a search.
-
-### Usage
+Examples:
 
 ```bash
-jbcontext search "<detailed and descriptive query>"
-jbcontext search -p <path> "<query>"  # <path> must be relative to the project root
+jbcontext search "loading and validating repository configuration"
+jbcontext symbol-search '^ConfigLoader$' -p src
+jbcontext text-search 'ConfigLoader' -w -p src
+jbcontext regex-search 'timeout(Millis|Seconds)' -p config
+jbcontext file-search '**/*config*.yaml'
+# Read/edit a returned location with native tools, then search the edited tree:
+jbcontext text-search 'newSetting' -p src/config
 ```
-
-### Query Tips
-
-- Be descriptive: "Where is a function that validates user email addresses" > "email"
-- Include context: "Find error handling middleware for HTTP requests with logging"
-- Specify what you're looking for: "React component that renders a modal dialog"
-- Use one focused natural-language query per search.
-- Do NOT start with grep, ripgrep, or find while the search problem is still semantic or exploratory.
-- Inspect the first relevant file or directory before issuing another broad semantic search.
-- Use another broad `jbcontext search` only if the local path stops being productive.
-- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local inspection.
-- If you search again after finding a relevant area, narrow with `-p <path>`.
-
-### Examples
-
-```bash
-# Find authentication-related code
-jbcontext search "user authentication login flow"
-
-# Narrow to specific directory
-jbcontext search -p src/auth "JWT token validation"
-
-# Find callers of a function
-jbcontext search "calls to handleRequest to understand impact"
-
-# Find related tests
-jbcontext search -p test "tests for authentication middleware"
-```
-
-Use `jbcontext search` first for discovery, inspect the first good hit, then move to exact/local inspection once the target area is known.

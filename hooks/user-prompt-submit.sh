@@ -1,27 +1,6 @@
 #!/usr/bin/env bash
+# Compatibility reminder for legacy installations. Never denies a tool call.
 set -euo pipefail
-
-INPUT="$(cat)"
-SESSION_ID="$(jq -r '.session_id // empty' <<<"$INPUT")"
-
-if [[ -z "$SESSION_ID" ]]; then
-  exit 0
-fi
-
-STATE_FILE="/tmp/claude-context-hook-${SESSION_ID}.json"
-umask 077
-
-jq -n '{
-  bootstrap_done: false,
-  read_after_bootstrap: false,
-  narrowed_retry_used: false
-}' > "$STATE_FILE"
-
-CONTEXT="Workflow: if the relevant file or subsystem is still unclear, use semantic search before broad local discovery. After a semantic result, read at least one returned file before expanding locally with nearby files in that same directory or subsystem. If another semantic search is still needed, narrow it: on CLI use \`jbcontext search -p <path> ...\`, and on MCP set \`pathFilter\`."
-
-jq -n --arg ctx "$CONTEXT" '{
-  hookSpecificOutput: {
-    hookEventName: "UserPromptSubmit",
-    additionalContext: $ctx
-  }
-}'
+cat >/dev/null
+command -v jq >/dev/null || exit 0
+jq -n --arg message 'Use jbcontext for repository searches, including exact follow-ups: behavior -> search/code_search; literal or identifier -> text-search/text_search; pattern -> regex-search/regex_search; declaration -> symbol-search/symbol_search; filename -> file-search/file_search. Read/edit known locations natively. Precise tools search current edits. External search fallback needs a brief reason after an error or unsupported capability; empty results alone are not failure.' '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $message}}'

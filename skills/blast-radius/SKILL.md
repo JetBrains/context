@@ -100,3 +100,10 @@ gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
 - Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.
+
+For checked-out repositories, use jbcontext text-search for literal identifiers,
+regex-search for patterns, symbol-search for declarations, and file-search for
+filename globs, including follow-ups in known files. These precise tools are
+local; remote repositories without a checkout use indexed code_search/search.
+Read known locations natively. External search fallback requires a brief reason
+after an error or unsupported capability; empty results alone are not failure.
