@@ -40,6 +40,14 @@ nonblocking reminders; legacy enforcer invocations no longer deny tools or keep
 bootstrap state. Reinstall agent integration with the CLI built against this
 branch to refresh installed instructions, tools, and managed rules.
 
+Claude MCP setup loads jbcontext eagerly with `alwaysLoad: true` on its server
+registration. This exposes all five search schemas in the first model request;
+other servers can keep deferred discovery. Reinstall setup after upgrading the
+CLI to repair an existing registration. A manually supplied `--mcp-config` must
+also put `alwaysLoad: true` on its `jbcontext` entry. If schemas are deferred,
+load them through `ToolSearch` before calling a search tool. Broad search takes
+`text`; precise tools take `pattern`.
+
 # Repository search with jbcontext
 
 Use jbcontext for every repository search: source, tests, configuration,

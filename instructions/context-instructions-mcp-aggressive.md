@@ -8,6 +8,18 @@ documentation, filenames, and exact follow-ups in known files or directories.
 Choose the tool that matches the question; keep using jbcontext as you learn
 identifiers and after making edits.
 
+MCP calls use `text` for `code_search` and `pattern` for each precise tool.
+For example: `code_search({"text":"load and validate configuration"})`,
+`text_search({"pattern":"ConfigLoader"})`,
+`regex_search({"pattern":"timeout(Millis|Seconds)"})`,
+`symbol_search({"pattern":"^ConfigLoader$"})`, and
+`file_search({"pattern":"**/*config*.yaml"})`. Do not guess a `query` argument.
+Use the full tool schema before calling it. In Claude, if only deferred tool
+names are visible, first call `ToolSearch` with
+`{"query":"select:mcp__jbcontext__code_search,mcp__jbcontext__text_search,mcp__jbcontext__regex_search,mcp__jbcontext__symbol_search,mcp__jbcontext__file_search","max_results":5}`.
+A missing-argument error requires checking the schema and retrying the correct
+call before treating retrieval as unavailable.
+
 | Need | CLI | MCP |
 | --- | --- | --- |
 | Behavior, intent, or similar code | `jbcontext search "<focused question>"` | `code_search(text=...)` |
