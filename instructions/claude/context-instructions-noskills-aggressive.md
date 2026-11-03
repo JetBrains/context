@@ -47,6 +47,8 @@ not whether every task needs a search.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
   inspection.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
+- If two of your own searches have not located the code, switch to exact search (`Grep`, `rg`, `git grep`) for
+  identifiers from the task or from the hits instead of searching semantically again.
 
 ### Examples
 
