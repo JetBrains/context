@@ -1,44 +1,5 @@
 # Tools
 
-## Code discovery: context-explorer first
-
-When a task requires finding or understanding code whose location you don't
-already know, your FIRST code-discovery step MUST be:
-
-Task(subagent_type='context-explorer',
-     description=<short label>,
-     prompt=<1-2 sentence intent describing what to find>)
-
-Start there instead of opening with your own `grep`/`glob`/`bash` searches or
-git history: the subagent runs the semantic exploration in its own context and
-hands back concrete `file:line` references, so you don't burn your context
-re-reading the same files.
-
-This governs *how* you begin code discovery - not whether every task needs it.
-Do NOT call context-explorer when the task doesn't involve locating code:
-
-- the task names the exact file, class, or symbol - open it or grep directly;
-- the relevant file is already open or identified;
-- the work is a git operation (rebase, merge, commit), a test/build run,
-  shell/statusline/config setup, or a review of a diff you already have.
-
-Invoking context-explorer as a formality "to get started" on such tasks wastes
-a subagent round and returns irrelevant findings. It is a research step, not a
-gate to clear - skip it and proceed directly.
-
-When you do use it, the subagent runs up to 3 semantic searches in its own
-context (restricted to `jbcontext search` via `Bash` and `Read` only) and
-returns a short report:
-
-Searched: <one-line summary>
-Findings:
-- <relative/path>:<line> - <description>
-- ...
-Notes: <confidence; whether keyword grep would be more direct here>
-
-Use its findings if they look useful, or ignore them entirely if `Notes:` flags
-the task as keyword-based. You retain full freedom for the rest of the run.
-
 ## Semantic Code Search (jbcontext)
 
 You have access to `jbcontext search` for searching the codebase semantically.
@@ -53,29 +14,70 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 
 ### Query Tips
 
-- Be descriptive: "function that validates user email addresses" > "email"
-- Include context: "error handling middleware for HTTP requests with logging"
+- Be descriptive: "Where is a function that validates user email addresses" > "email"
+- Include context: "Find error handling middleware for HTTP requests with logging"
 - Specify what you're looking for: "React component that renders a modal dialog"
 
-### Single-Shot Policy
+### When to use
 
-Use `jbcontext search` as a semantic bootstrap when the relevant file or subsystem is still unknown.
+`jbcontext search` is a **search tool for repositories**. Use it when you need to find something in the
+repo and don't know where to look.
 
-- If no relevant file is open yet, start with one `jbcontext search`.
-- Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
-- After the first search, open at least one returned file and inspect it locally.
-- If the first hit is relevant but incomplete, inspect neighboring files locally in that same directory or subsystem before any semantic retry.
-- After the first relevant file or path is known, prefer direct file reads and exact search to inspect nearby code.
-- If a semantic retry is still needed, use `jbcontext search -p <path> ...` with the directory of the best first hit.
+Skip it - go straight to the right tool - when:
+
+- the task names the exact file, class, or symbol (keyword grep is faster);
+- the relevant file is already open or identified;
+- the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds,
+  shell/statusline/config setup, or reviewing a diff you already have.
+
+### MANDATORY: jbcontext-first bootstrap
+
+When code discovery *is* needed and no relevant file or subsystem is known yet, your first code-search action MUST be
+`jbcontext search` - do not open with `rg`/`grep`/`find` or git history. This mandate governs *how* you start searching,
+not whether every task needs a search.
+
+### How to use it
+
+- Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know
+  the right file, subsystem, implementation, or related test.
+- Use one focused natural-language query per search.
+- Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
+- Inspect the first relevant file or directory before issuing another broad semantic search.
+- Use another broad `jbcontext search` only if the local path stops being productive.
+- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
+  inspection.
+- If you search again after finding a relevant area, narrow with `-p <path>`.
+- If two of your own searches have not located the code, delegate to `context-explorer` (see below) instead of
+  searching semantically again.
 
 ### Examples
 
 ```bash
-# Find authentication-related code
-jbcontext search "user authentication login flow"
+# Find code by its behavior
+jbcontext search "code that retries failed HTTP requests with exponential backoff"
 
 # Narrow to specific directory
-jbcontext search -p src/auth "JWT token validation"
+jbcontext search -p src/auth "Where is the code that verifies a JWT's signature and checks that it has not expired?"
+# Find related tests
+jbcontext search -p test "tests checking that unauthenticated requests are rejected by middleware"
+
+# Find documentation or specs
+jbcontext search "design doc describing how the authentication flow handles token refresh"
 ```
 
-Use `jbcontext search` once to get the initial pointer, then inspect nearby code locally. If that still fails, do a narrowed retry with `-p`.
+## Subagent: `context-explorer`
+
+For broader or multi-step exploration that your own searches did not resolve, delegate to the `context-explorer`
+subagent. It is a read-only agent that runs several `jbcontext search` queries in its own context, reads the promising
+files, and returns concrete `file:line` references with inline code snippets and a confidence note - so this thread
+stays uncluttered by intermediate search output and does not have to re-read the same files.
+
+- Spawn it with the Agent tool (named Task in older versions):
+  `subagent_type="context-explorer"`, `description="<short label>"`, `prompt="<1-2 sentence intent>"`.
+- Use its snippets directly: re-open a file it quoted only for lines it did not show.
+
+### When to use `jbcontext search` vs. `context-explorer`
+
+A `context-explorer` run takes far longer than a search, and you need its report before you can act on it, so search
+yourself first. Spawn it only when your own two searches did not locate the code, or when the task clearly spans
+several separate areas you have not located yet. Never spawn it once a search hit already names the code to change.
