@@ -23,7 +23,18 @@ jbcontext search -p <path> "<query>"  # <path> must be relative to the project r
 - Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know the right file, subsystem, implementation, or related test.
 - Use one focused natural-language query per search.
 - Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
-- Once you get a relevant hit, switch to direct file reads. If the first search did not locate the code, run one follow-up search yourself - narrowed with `-p <directory of the best hit>` or reworded in code terms - before considering `context_explorer`.
+- Once you get a relevant hit, switch to direct file reads, and follow a symbol with the IDE CLI. If the first search did not locate the code, run one follow-up search yourself - narrowed with `-p <directory of the best hit>` or reworded in code terms - before considering `context_explorer`.
+
+### With the IDE CLI (`ide`)
+
+The IDE CLI is installed too; its session note lists its commands and flags. It resolves real symbols, while `jbcontext search` finds code by meaning. Pick the tool by what you already know:
+
+- Only a behavior or concept, location unknown -> `jbcontext search`, then `context_explorer` as below.
+- A class or symbol name, from the task or a search hit, and you need where it is declared or used -> `ide usages` (declaration, usages and text mentions in one call), `ide references` or `ide implementations` (callers, overrides), `ide definition` (its code). Do not spawn `context_explorer` for these.
+- Literal text - strings, log messages, config keys, file names - or several patterns at once -> `rg`/`grep`/`find`.
+- After editing -> `ide diagnostics` on the touched files. It does not replace the build or the tests.
+
+Ask each question once, with the tool that fits it: do not re-run a `jbcontext search` hit through `ide workspace-symbols`, or an `ide usages` result through grep. If `ide` is not found, answers "warming up", or reports that the project import failed, use `rg`/`grep` for that step; `jbcontext search` does not need the IDE CLI's project model.
 
 ## Subagent: `context_explorer`
 

@@ -25,7 +25,7 @@ repo and don't know where to look.
 
 Skip it - go straight to the right tool - when:
 
-- the task names the exact file, class, or symbol (keyword grep is faster);
+- the task names the exact file, class, or symbol - open the file, or follow the symbol with the IDE CLI (below);
 - the relevant file is already open or identified;
 - the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds,
   shell/statusline/config setup, or reviewing a diff you already have.
@@ -44,9 +44,26 @@ not whether every task needs a search.
 - Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
 - Inspect the first relevant file or directory before issuing another broad semantic search.
 - Use another broad `jbcontext search` only if the local path stops being productive.
-- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
-  inspection.
+- Once you know the relevant file or directory, read it directly; once you know a symbol, follow it with the IDE CLI;
+  use exact search for literal text.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
+
+### With the IDE CLI (`ide`)
+
+The IDE CLI is installed too; its session note lists its commands and flags. It resolves real symbols, while
+`jbcontext search` finds code by meaning. Pick the tool by what you already know:
+
+- Only a behavior or concept, location unknown -> `jbcontext search`.
+- A class or symbol name, from the task or a search hit, and you need where it is declared or used -> `ide usages`
+  (declaration, usages and text mentions in one call), `ide references` or `ide implementations` (callers,
+  overrides), `ide definition` (its code).
+- Literal text - strings, log messages, config keys, file names - or several patterns at once -> `rg`/`grep`/`find`.
+- After editing -> `ide diagnostics` on the touched files. It does not replace the build or the tests.
+
+Ask each question once, with the tool that fits it: do not re-run a `jbcontext search` hit through
+`ide workspace-symbols`, or an `ide usages` result through grep. If `ide` is not found, answers "warming up", or reports
+that the project import failed, use `rg`/`grep` for that step; `jbcontext search` does not need the IDE CLI's project
+model.
 
 ### Examples
 
