@@ -1,0 +1,26 @@
+{
+  "$comment": [
+    "Cell codex+gpt-6-luna+medium of SWE-Bench-LG Private, exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.19.1421 on the release channel, codex 0.166.0, flags --auto.",
+    "Warning: Missing metrics: turns, toolCalls — unavailable for comparison, not published.",
+    "The arm run WITHOUT jbcontext: TeamCity build #11, the baseline of this declared configuration.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "baseline",
+  "dataset": "swebench-lg-private",
+  "harness": "codex",
+  "model": "gpt-6-luna",
+  "effort": "medium",
+  "taskCount": 435,
+  "resolvedRate": 0.3793,
+  "run": {
+    "pipeline": "https://jcp.internal.teamcity.cloud/buildConfiguration/Deployments_Meta_Emb_Idx_Eval_SwebenchLgPrivate/1823924",
+    "startedAt": "20261105T084045+0000"
+  },
+  "metrics": {
+    "costUsd": 0.027,
+    "latencyMs": 194563.0
+  }
+}
