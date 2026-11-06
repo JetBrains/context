@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "Cell codex+gpt-6-luna+medium of Ultimate Private, exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.19.1421 on the release channel, codex 0.166.0, flags --auto.",
+    "The arm run WITHOUT jbcontext: TeamCity build #6, the baseline of this declared configuration.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
+    "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
+    "toolCalls: mean tool calls per task, from the junie_number_tool_calls_avg build statistic",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "baseline",
+  "dataset": "ultimate-valid-lite-private",
+  "harness": "codex",
+  "model": "gpt-6-luna",
+  "effort": "medium",
+  "taskCount": 126,
+  "resolvedRate": 0.5635,
+  "run": {
+    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsUltimateSweBenchValidLiteOnlyPrivateWithSeedsEmbark/7517511",
+    "startedAt": "20261105T092703+0000"
+  },
+  "metrics": {
+    "costUsd": 0.0179,
+    "turns": 1.0,
+    "toolCalls": 58.37,
+    "latencyMs": 141500.0
+  }
+}
