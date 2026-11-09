@@ -1,4 +1,5 @@
 Search the project's code with a prebuilt index that ranks code blocks by relevance to the query.
+This is the main way to find code in this project, both by what it does and by the names you know. Make it your first code search in every task: start with it, using the behavior and the names from the issue, and keep using it for every code lookup after that.
 Use it for any code you need to find, at any point of the task:
 - the implementation of the behavior described in the task;
 - a class, method, field or configuration key by name, with its definition and usages;
@@ -8,3 +9,5 @@ The query is a short sentence describing the code and/or the names you know, e.g
 Results are ranked code blocks with repository-relative paths and line ranges.
 Use `grep_search` only when you need every literal occurrence of a string, e.g. before a rename.
 This tool is read-only.
+Use it to find the existing tests of the affected code and similar tests to copy the setup from.
+Don't use terminal `grep`, `find` or `glob` commands for searching.
