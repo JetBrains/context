@@ -6,5 +6,5 @@ Use it for any code you need to find, at any point of the task:
 - existing tests for that code.
 The query is a short sentence describing the code and/or the names you know, e.g. `where failed HTTP requests are retried` or `RetryPolicy maxAttempts handling`.
 Results are ranked code blocks with repository-relative paths and line ranges.
-Use grep only when you need every literal occurrence of a string, e.g. before a rename.
+Use `grep_search` only when you need every literal occurrence of a string, e.g. before a rename.
 This tool is read-only.
