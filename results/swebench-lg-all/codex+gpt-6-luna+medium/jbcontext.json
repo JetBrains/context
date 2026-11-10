@@ -21,7 +21,7 @@
     "startedAt": "20260928T203253+0000"
   },
   "metrics": {
-    "costUsd": 0.029,
-    "latencyMs": 286350.0
+    "costUsd": 0.025,
+    "latencyMs": 286564.0
   }
 }
