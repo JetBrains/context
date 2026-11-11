@@ -15,19 +15,28 @@
 #     the session created by the measured run. WarmRead = cache_read on that session's FIRST
 #     call (from the transcript); >0 confirms the warm-up populated the cache.
 #   - Restores the original cache environment on exit.
+#   - Writes an HTML trajectory diff of the two measured sessions (trajectory_report.py, next
+#     to this script): both runs on one time axis, keyword search vs. semantic retrieval
+#     highlighted, and a step-by-step diff. --no-report skips it; --report-out sets the file.
 #
-# Usage:  ./singe-query-bench-claude.sh [--model <id>] [query]
+# Usage:  ./single-query-bench-claude.sh [--model <id>] [--no-report] [--report-out <file>] [query]
 
 set -euo pipefail
 
 MODEL="claude-opus-4-8"
 PROMPT=""
+REPORT=1
+REPORT_OUT=""
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --model) MODEL="$2"; shift 2 ;;
         --model=*) MODEL="${1#*=}"; shift ;;
-        -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+        --no-report) REPORT=0; shift ;;
+        --report-out) REPORT_OUT="$2"; shift 2 ;;
+        --report-out=*) REPORT_OUT="${1#*=}"; shift ;;
+        -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
         *) PROMPT="$1"; shift ;;
     esac
 done
@@ -39,7 +48,7 @@ MODEL_ARGS=()
 CACHE_VARS="DISABLE_PROMPT_CACHING DISABLE_AUTOUPDATER ENABLE_PROMPT_CACHING_1H"
 
 # Indexed arrays are fine on bash 3.2 (macOS); associative arrays are not, so we avoid them.
-SUM_LABEL=(); SUM_COST=(); SUM_WALL=(); SUM_API=(); SUM_CREAD=()
+SUM_LABEL=(); SUM_COST=(); SUM_WALL=(); SUM_API=(); SUM_CREAD=(); SUM_SID=()
 
 # --- Cache env save / enable / restore (portable, no associative arrays) --------------------
 save_and_enable_caches() {
@@ -98,7 +107,7 @@ pause() {
 # launch cwd). Instead we detect the session created by the measured run as the one whose
 # lastSessionId is new since the pre-run snapshot.
 # pyhelper snapshot            -> JSON [sessionId, ...] currently recorded across all projects
-# pyhelper result <preJSON>    -> "lastCost|lastDuration|lastAPIDuration|firstCallCacheRead"
+# pyhelper result <preJSON>    -> "lastCost|lastDuration|lastAPIDuration|firstCallCacheRead|sessionId"
 #                                 for the newest newly-created session, else "" (retry)
 pyhelper() {
     python3 - "$@" <<'PY'
@@ -157,8 +166,8 @@ for p in glob.glob(os.path.join(BASE, "*", sid + ".jsonl")):
         pass
     if first_read != "": break
 
-print("%s|%s|%s|%s" % (ent.get("lastCost", ""), ent.get("lastDuration", ""),
-                       ent.get("lastAPIDuration", ""), first_read))
+print("%s|%s|%s|%s|%s" % (ent.get("lastCost", ""), ent.get("lastDuration", ""),
+                          ent.get("lastAPIDuration", ""), first_read, sid))
 PY
 }
 
@@ -199,10 +208,10 @@ invoke_run() {
         sleep 0.4
     done
 
-    local cost="n/a" wall="n/a" api="n/a" cread=""
+    local cost="n/a" wall="n/a" api="n/a" cread="" sid=""
     if [ -n "$out" ]; then
         local c dms ams
-        IFS='|' read -r c dms ams cread <<<"$out"
+        IFS='|' read -r c dms ams cread sid <<<"$out"
         [ -n "$c" ]   && cost="$(printf '%.4f' "$c")"
         [ -n "$dms" ] && wall="$(fmt_ms "$dms")"
         [ -n "$ams" ] && api="$(fmt_ms "$ams")"
@@ -223,6 +232,34 @@ invoke_run() {
     fi
 
     SUM_LABEL+=("$label"); SUM_COST+=("$cost"); SUM_WALL+=("$wall"); SUM_API+=("$api"); SUM_CREAD+=("${cread:-n/a}")
+    SUM_SID+=("${sid:-none}")
+}
+
+# --- HTML trajectory diff of the two measured sessions --------------------------------------
+# Leg 0 ran WITH JetBrains Context, leg 1 WITHOUT. Never fails the benchmark: the numbers above
+# are already printed, so a missing transcript or script only costs the report.
+write_report() {
+    [ "$REPORT" = "1" ] || return 0
+    local with_sid="${SUM_SID[0]:-none}" without_sid="${SUM_SID[1]:-none}"
+    local report_py="$SCRIPT_DIR/trajectory_report.py"
+    if [ "$with_sid" = "none" ] || [ "$without_sid" = "none" ]; then
+        echo "Trajectory diff skipped: a measured session was not recorded." >&2; return 0
+    fi
+    if [ ! -f "$report_py" ]; then
+        echo "Trajectory diff skipped: $report_py not found." >&2; return 0
+    fi
+    local out_file="$REPORT_OUT"
+    if [ -z "$out_file" ]; then
+        out_file="${TMPDIR:-/tmp}"; out_file="${out_file%/}/jbcontext-bench/trajectory-diff-$(date +%Y%m%d-%H%M%S).html"
+    fi
+    echo
+    if out_file="$(python3 "$report_py" --with "$with_sid" --without "$without_sid" --query "$PROMPT" --out "$out_file")"; then
+        echo "Trajectory diff (HTML): $out_file"
+        echo "  Re-create it later:  python3 $report_py --with $with_sid --without $without_sid"
+    else
+        echo "Trajectory diff not written -- see the error above (the benchmark numbers are unaffected)." >&2
+        echo "  Choose another location with --report-out <file>." >&2
+    fi
 }
 
 main() {
@@ -252,6 +289,8 @@ main() {
     echo
     echo "Cost/Wall/API are Claude Code's OFFICIAL figures for the measured (2nd) session."
     echo "WarmRead = cache_read on that session's first call; >0 means the warm-up populated the cache."
+
+    write_report
 }
 
 main

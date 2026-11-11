@@ -18,12 +18,18 @@
     git-repo root). WarmRead = cache_read on that session's FIRST call (from the transcript);
     >0 confirms the warm-up populated the cache.
   - Restores the original cache environment in a finally block.
+  - Writes an HTML trajectory diff of the two measured sessions (trajectory_report.py, next to
+    this script; needs Python 3 on PATH): both runs on one time axis, keyword search vs.
+    semantic retrieval highlighted, and a step-by-step diff. -NoReport skips it; -ReportOut
+    sets the file.
 #>
 
 [CmdletBinding()]
 param(
     [string]$Prompt,
-    [string]$Model   # empty => Claude Code's default model
+    [string]$Model,      # empty => Claude Code's default model
+    [switch]$NoReport,   # skip the HTML trajectory diff
+    [string]$ReportOut   # where to write it (default: a file under the temp folder)
 )
 
 $ErrorActionPreference = "Stop"
@@ -168,7 +174,61 @@ function Get-Result($preSids) {
         WallMs    = (Get-Val $best.V 'lastDuration')
         ApiMs     = (Get-Val $best.V 'lastAPIDuration')
         FirstRead = (Get-FirstCallRead $best.Sid)
+        Sid       = $best.Sid
     }
+}
+
+# HTML trajectory diff of the two measured sessions ($results[0] ran WITH JetBrains Context,
+# $results[1] WITHOUT). Never fails the benchmark: the numbers are already printed.
+function Write-TrajectoryReport($results) {
+    if ($NoReport) { return }
+    $withSid = $results[0].Sid; $withoutSid = $results[1].Sid
+    if (-not $withSid -or -not $withoutSid) {
+        Write-Warning "Trajectory diff skipped: a measured session was not recorded."; return
+    }
+    $script = Join-Path $PSScriptRoot "trajectory_report.py"
+    if (-not (Test-Path -LiteralPath $script)) {
+        Write-Warning "Trajectory diff skipped: $script not found."; return
+    }
+    $out = $ReportOut
+    if (-not $out) {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) "jbcontext-bench"
+        $out = Join-Path $dir ("trajectory-diff-{0}.html" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+    }
+    # The report script creates the output folder itself and names the path when it cannot write
+    # there. Two different failures, two different messages: no usable Python, or Python ran and
+    # the report failed (unwritable folder, missing transcript) -- then its own error is shown.
+    # Native stderr must not become a terminating error here (the script runs with Stop).
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        foreach ($py in @('python3', 'python', 'py')) {
+            $cmd = Get-Command $py -ErrorAction SilentlyContinue
+            if (-not $cmd) { continue }
+            # Skip the Microsoft Store alias and anything that is not Python 3.
+            $version = $null
+            try { $version = (& $cmd.Source --version 2>&1 | Out-String) } catch { }
+            if ($LASTEXITCODE -ne 0 -or $version -notmatch 'Python 3') { continue }
+
+            $lines = @()
+            try { $lines = @(& $cmd.Source $script --with $withSid --without $withoutSid --out $out 2>&1) } catch { $lines = @($_) }
+            $code = $LASTEXITCODE
+            $errors = @($lines | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ })
+            $path   = @($lines | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) | Select-Object -Last 1
+            if ($code -eq 0 -and $path) {
+                Write-Host ""
+                Write-Host "Trajectory diff (HTML): $path" -ForegroundColor Green
+                return
+            }
+            $reason = if ($errors.Count -gt 0) { $errors[-1] } else { "$py exited with code $code" }
+            Write-Warning "Trajectory diff not written to $out -- $reason"
+            Write-Warning "The benchmark numbers above are unaffected. Choose another location with -ReportOut <file>."
+            return
+        }
+    } finally {
+        $ErrorActionPreference = $saved
+    }
+    Write-Warning "Trajectory diff not written: no Python 3 found on PATH (tried python3, python, py). With Python installed, run: python `"$script`" --with $withSid --without $withoutSid"
 }
 
 function Invoke-ClaudeRun([string]$label, [string]$query) {
@@ -202,9 +262,9 @@ function Invoke-ClaudeRun([string]$label, [string]$query) {
         if ($null -eq $r) { Start-Sleep -Milliseconds 400 }
     }
 
-    $costUsd = $null; $wallMs = $null; $apiMs = $null; $cread = $null
+    $costUsd = $null; $wallMs = $null; $apiMs = $null; $cread = $null; $sid = $null
     if ($r) {
-        $costUsd = $r.Cost; $wallMs = $r.WallMs; $apiMs = $r.ApiMs; $cread = $r.FirstRead
+        $costUsd = $r.Cost; $wallMs = $r.WallMs; $apiMs = $r.ApiMs; $cread = $r.FirstRead; $sid = $r.Sid
     } else {
         Write-Warning "No fresh session recorded for the measured run (did it run a turn?)."
     }
@@ -228,6 +288,7 @@ function Invoke-ClaudeRun([string]$label, [string]$query) {
         WallMs   = $wallMs
         ApiMs    = $apiMs
         WarmRead = $cread
+        Sid      = $sid
     }
 }
 
@@ -263,6 +324,8 @@ try {
 
     Write-Host "Cost/Wall/API are Claude Code's OFFICIAL figures for the measured (2nd) session." -ForegroundColor DarkGray
     Write-Host "WarmRead = cache_read on that session's first call; >0 means the warm-up populated the cache." -ForegroundColor DarkGray
+
+    Write-TrajectoryReport $results
 }
 finally {
     # --- Restore original environment ------------------------------------------------------
