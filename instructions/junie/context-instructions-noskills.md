@@ -1,6 +1,6 @@
 # Tools
 
-## Code Search (jbcontext)
+## Semantic Code Search (jbcontext)
 
 `jbcontext search "<query>"` searches the project's code with a prebuilt index that ranks code blocks by relevance to the query and shows the code of the top results. The query is a short sentence describing the code and/or the names you know, e.g. `jbcontext search "where failed HTTP requests are retried"` or `jbcontext search "RetryPolicy maxAttempts handling"`. Narrow to a directory with `-p <path>`.
 
