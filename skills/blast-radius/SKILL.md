@@ -61,15 +61,15 @@ jbcontext repos
 
 Note: `jbcontext repos` returns each repo's `repository` git-remote-url (e.g. `github.com/jetbrains/context`) - this is the exact value `jbcontext search --git-remote-url` expects. To populate the curated list, find a repo with `jbcontext repos "<terms>" --json-output` and copy its `repository` value into a new row.
 
-2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
+2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `acme-*`, treat it as a repository-family constraint.
 
-- Query the prefix literally, for example `jcp` and `jcp-`.
+- Query the prefix literally, for example `acme` and `acme-`.
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
 - Preserve the exact `repository` git-remote-url returned by `jbcontext repos`; do not infer it from names.
 
 ```
-jbcontext repos "jcp-" # Example: show all repos started with jcp- prefix
+jbcontext repos "acme-" # Example: show all repos started with acme- prefix
 ```
 
 3. **Select suitable repos.** Start from the rows whose `When relevant` triggers matched in the project's curated list, then add any exact owner/consumer/producer repos, prefix-family matches, and repos whose description/path/language/domain matches the changed surface (from the fallback `jbcontext repos` discovery). If there are many candidates, search the most likely 5-10 first, then expand if results are weak.

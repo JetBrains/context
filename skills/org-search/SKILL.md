@@ -31,15 +31,15 @@ jbcontext repos "<repo or domain terms>" --limit 30
 
 Use short, discriminative repo terms from the request: product names, service names, team names, package names, or explicit repository names. The query matches repository names and what a repository does, so when the name is unknown describe its purpose or stack in a few words instead.
 
-2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `jcp-*`, treat it as a repository-family constraint.
+2. **Handle prefixed repository families carefully.** If the request mentions a prefix or wildcard such as `acme-*`, treat it as a repository-family constraint.
 
-- Query the prefix literally, for example `jcp` and `jcp-`.
+- Query the prefix literally, for example `acme` and `acme-`.
 - Keep all suitable repos whose names start with that prefix.
 - Do not replace a prefixed repo family with a similar unprefixed repo unless the repo results clearly show it is the right target.
 - Preserve the exact `repository` value returned by `jbcontext repos`; do not infer it from names.
 
 ```
-jbcontext repos "jcp-" # show all repos started with jcp- prefix
+jbcontext repos "acme-" # show all repos started with acme- prefix
 ```
 
 You can omit query completely.
