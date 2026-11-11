@@ -54,7 +54,7 @@ jbcontext search --git-remote-url "<repository>" --json-output --limit 10 "<sema
 
 Run independent repo searches in parallel when the agent environment supports parallel tool calls; otherwise keep results grouped by repository.
 
-5. **Resolve snippets and repo information with `gh`.** When `jbcontext search` returns promising snippets, use the GitHub CLI to fetch full file context, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `jbcontext repos` when available.
+5. **Resolve snippets and repo information.** When `jbcontext search` returns promising snippets, read the full file from the local checkout if the repository is on disk; otherwise, if `gh` is available, use the GitHub CLI to fetch full file context, surrounding code, default branch, repo metadata, owners, recent commits, or related PRs/issues before relying on the match. Use the GitHub owner/name or URL from `jbcontext repos` when available.
 
 ```bash
 gh repo view "<owner>/<repo>" --json nameWithOwner,description,defaultBranchRef,url
@@ -69,4 +69,4 @@ gh api "repos/<owner>/<repo>/contents/<path>?ref=<ref>" -H "Accept: application/
 - Re-run `jbcontext repos` with narrower or prefix-aware terms before broadening code search; if a description query returns nothing, fall back to name terms.
 - Use path filters only after repo-level matches identify likely directories.
 - Keep repository names and ids visible in notes so later searches can be reproduced.
-- Use `gh` to resolve snippets into full source context and to gather more information about matching repositories.
+- Resolve snippets into full source context from the local checkout if it is on disk, otherwise with `gh` if available.
