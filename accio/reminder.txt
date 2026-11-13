@@ -1,0 +1,1 @@
+Use {{JBCONTEXT}} search for behavior or meaning. Use the matching enabled local {{JBCONTEXT}} command for exact or structural questions. Enabled local tools: {{ACCIO_TOOL_NAMES}}. Read/edit known locations directly; use external search if the required capability is disabled, unsupported, or unavailable.

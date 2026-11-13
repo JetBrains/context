@@ -1,0 +1,1 @@
+- Inspect callers or callees: `{{JBCONTEXT}} trace Service.run --direction callers --depth 2` (or `--direction callees`).

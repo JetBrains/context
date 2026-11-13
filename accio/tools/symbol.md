@@ -1,0 +1,1 @@
+- Find declarations and source bodies: `{{JBCONTEXT}} symbol Service.run --source-lines`. Use `--at path:line` to identify a known declaration precisely.

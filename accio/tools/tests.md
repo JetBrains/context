@@ -1,0 +1,1 @@
+- Find tests reaching a declaration: `{{JBCONTEXT}} tests Service.run --depth 3`. Check cut/frontier and resolution notes before concluding coverage is absent.

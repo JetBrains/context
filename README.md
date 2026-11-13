@@ -31,3 +31,25 @@ Read-only exploration subagents that run several `jbcontext search` queries in t
 |---|---|
 | `context-explorer` (Claude) | `agents/claude/context-explorer.md` — Claude subagent, invoked via `Task(subagent_type='context-explorer', ...)`. |
 | `context_explorer` (Codex) | `agents/codex/context-explorer.toml` — Codex custom agent (install under `~/.codex/agents/` or `.codex/agents/`). Codex spawns subagents only when asked, so request it directly, e.g. "use `context_explorer` to map the auth flow". |
+
+## Air Context + Accio experiment
+
+The `malek/context-accio` CLI branch packages Accio v0.28.0 and enables its nonsemantic tools by default.
+Prompts in `accio/` are rendered from the persisted tool selection. Edit the base instructions, skill, explorer,
+reminder, or individual tool fragments here; `{{ACCIO_TOOLS}}`, `{{ACCIO_TOOL_NAMES}}`, and `{{JBCONTEXT}}`
+are expanded during setup and refresh. Standard prompt variants remain available with `--no-accio`.
+
+Use this experiment prompts location:
+
+```text
+https://github.com/JetBrains/context/tree/malek/context-accio
+```
+
+Example experiment flags:
+
+```text
+--auto
+--auto --accio-tools locate,files,symbol,references
+--auto --accio-disable-tools trace,impact,tests
+--auto --no-accio
+```
