@@ -2,8 +2,9 @@
   "$comment": [
     "Cell codex+gpt-6.1-terra+medium of SWE-Bench-LG Private, exported from the Agentic Benchmark page on the run pair below.",
     "jbcontext 0.9.19.1421 on the release channel, codex 0.167.0, flags --auto.",
-    "Warning: Missing metrics: costUsd, turns, toolCalls — unavailable for comparison, not published.",
+    "Warning: Missing metrics: turns, toolCalls — unavailable for comparison, not published.",
     "The arm run WITH jbcontext: TeamCity build #64.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
     "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
   ],
   "schema": "jbcontext-eval-arm/1",
@@ -20,6 +21,7 @@
     "startedAt": "20261108T173252+0000"
   },
   "metrics": {
+    "costUsd": 0.1575,
     "latencyMs": 183197.0
   }
 }

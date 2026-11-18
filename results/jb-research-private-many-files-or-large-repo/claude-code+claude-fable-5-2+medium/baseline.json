@@ -1,0 +1,24 @@
+{
+  "$comment": [
+    "Cell claude-code+claude-fable-5-2+medium of BenchRoom (many files, large repos), exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.21.1593 on the release channel, claude-code 2.1.322, flags --auto.",
+    "Warning: Missing metrics: costUsd, turns, toolCalls — unavailable for comparison, not published.",
+    "The arm run WITHOUT jbcontext: TeamCity build #104, the baseline of this declared configuration.",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "baseline",
+  "dataset": "jb-research-private-many-files-or-large-repo",
+  "harness": "claude-code",
+  "model": "claude-fable-5-2",
+  "effort": "medium",
+  "taskCount": 396,
+  "resolvedRate": 0.0076,
+  "run": {
+    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsJbResearchPrivateSweBenchAllValidIdsAllIterationsManyFilesOrLargeRepoWithSeedsEmbark/7621579",
+    "startedAt": "20261112T171248+0000"
+  },
+  "metrics": {
+    "latencyMs": 846.0
+  }
+}
