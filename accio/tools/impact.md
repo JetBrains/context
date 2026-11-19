@@ -1,1 +1,1 @@
-- Inspect transitive callers affected by a change: `{{JBCONTEXT}} impact Service.run`; use `{{JBCONTEXT}} impact --changed` for working-tree declaration changes.
+- Inspect transitive callers affected by a change: `jbcontext impact Service.run`; use `jbcontext impact --changed` for working-tree declaration changes.

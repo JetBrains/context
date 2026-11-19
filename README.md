@@ -34,22 +34,22 @@ Read-only exploration subagents that run several `jbcontext search` queries in t
 
 ## Air Context + Accio experiment
 
-The `malek/context-accio` CLI branch packages Accio v0.28.0 and enables its nonsemantic tools by default.
-Prompts in `accio/` are rendered from the persisted tool selection. Edit the base instructions, skill, explorer,
-reminder, or individual tool fragments here; `{{ACCIO_TOOLS}}`, `{{ACCIO_TOOL_NAMES}}`, and `{{JBCONTEXT}}`
-are expanded during setup and refresh. Standard prompt variants remain available with `--no-accio`.
+The `kazaryan/accio-additive-haiku` CLI branch (based on `malek/context-accio`) packages Accio v0.28.0.
+With Accio tools enabled, setup installs the standard instructions unchanged and appends `accio/instructions.md`,
+a section on structural navigation; `{{ACCIO_TOOLS}}` expands to the enabled tools' lines from `accio/tools/`.
+The other files in `accio/` (skill, explorer, reminder) still replace their standard variants when Accio is on;
+`setup-agent --auto` for Claude Code installs none of them. Prompts name the command `jbcontext` literally.
+Standard prompt variants remain available with `--no-accio`.
 
 Use this experiment prompts location:
 
 ```text
-https://github.com/JetBrains/context/tree/malek/context-accio
+https://github.com/JetBrains/context/tree/kazaryan/accio-additive-haiku
 ```
 
-Example experiment flags:
+Experiment flags:
 
 ```text
---auto
---auto --accio-tools locate,files,symbol,references
---auto --accio-disable-tools trace,impact,tests
 --auto --no-accio
+--auto --accio-tools symbol,references,implementations
 ```

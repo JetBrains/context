@@ -1,1 +1,1 @@
-- Inspect build-module structure: `{{JBCONTEXT}} modules --paths src/Service.kt`.
+- Inspect build-module structure: `jbcontext modules --paths src/Service.kt`.

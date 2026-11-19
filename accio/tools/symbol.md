@@ -1,1 +1,1 @@
-- Find declarations and source bodies: `{{JBCONTEXT}} symbol Service.run --source-lines`. Use `--at path:line` to identify a known declaration precisely.
+- Where a declaration is and what its body is: `jbcontext symbol Service.run --source-lines`. Accepts `Name`, `Class.member` or `pkg.Name`; use `--at path:line` for the declaration on a known line.

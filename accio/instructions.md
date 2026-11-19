@@ -1,31 +1,29 @@
-# Repository search with {{JBCONTEXT}}
+## Structural Code Navigation (jbcontext)
 
-Use the matching {{JBCONTEXT}} command for repository searches throughout the task, including follow-ups and after edits.
-For behavior, intent, or similar code, use Air Context semantic search:
-
-```sh
-{{JBCONTEXT}} search "<focused natural-language question>"
-{{JBCONTEXT}} search -p src/ "<question scoped to this area>"
-```
-
-Describe an existing responsibility and its distinguishing constraints. Preserve observed identifiers and domain terms.
-Use semantic discovery when you do not know the relevant implementation. For a known name, exact text, filename, or
-structural question, use the matching enabled command below directly; no semantic bootstrap is required.
-
-## Enabled exact and structural tools
-
-These commands delegate to Accio locally. Only the following Accio tools are enabled:
+`jbcontext` also answers structural questions about a declaration whose name you already know (from the task,
+a `jbcontext search` result, or a file you have read). These commands work from an index of declarations: they
+find the declaration itself and label each use (call, read, write, import) instead of returning every line that
+contains the text.
 
 {{ACCIO_TOOLS}}
 
-Use `--scope <path-or-glob>` to narrow Accio searches, `--project <checkout>` for another local checkout,
-and `--ref <revision>` for committed code. Air Context uses its own `-p` / `--path-filter` option.
-Accio normally searches the working tree and refreshes edited and nonignored untracked files automatically.
-Use `--format json` where supported for structured output and `<command> --help` for the pinned command's options.
-Read the reported availability, quality, completeness, and truncation notes; an incomplete answer is not proof of absence.
+### When to use
 
-Read and edit known locations using native file tools. Builds, tests, Git operations, and filtering command output
-continue normally. Use external search when the needed capability is disabled, unsupported, or reports an error;
-state the reason briefly. Empty results alone are not a tool failure: check scope, spelling, and the chosen tool.
-Semantic search always goes through Air Context (`{{JBCONTEXT}} search`, or the existing `code_search` MCP tool when
-registered). Do not invoke Accio directly or use its semantic/context search.
+Use these commands, not grep or rg, for three questions about a known declaration:
+
+- Who uses it (callers of a function, reads and writes of a field, imports of a class): `jbcontext references`.
+- What implements or extends it (implementations of an interface, subclasses, overriding methods):
+  `jbcontext implementations`.
+- Where it is declared and what its body is: `jbcontext symbol --source-lines`.
+
+Ask them once you have found the code to change, and before you change a declaration that other code depends on
+(a signature, an interface method, a base class): check its uses and implementations so the change covers all
+of them.
+
+For these three questions this section takes precedence over "keyword grep is faster" and over "exact search"
+in the section above. Everything else stays as described above: start with `jbcontext search` when you do not
+know where the code is, use grep or rg for exact text, string literals, configuration keys and file names, and
+read files directly once you know them.
+
+If a command reports an error, or finds nothing for a name you know exists, fall back to grep or rg. The first
+line of the output says when results are partial.

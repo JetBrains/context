@@ -1,1 +1,1 @@
-- Exact text or regex occurrences: `{{JBCONTEXT}} locate "literal"` or `{{JBCONTEXT}} locate 'pattern' --mode regex`. Use `-i` for case-insensitive search and `-C 2` for surrounding lines. Semantic mode is unavailable.
+- Exact text or regex occurrences: `jbcontext locate "literal"` or `jbcontext locate 'pattern' --mode regex`. Use `-i` for case-insensitive search and `-C 2` for surrounding lines. Semantic mode is unavailable.

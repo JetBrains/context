@@ -1,1 +1,1 @@
-- Find implementations and subtypes: `{{JBCONTEXT}} implementations Service --depth 2`.
+- What implements or extends a type: `jbcontext implementations Service --depth 2` (`--depth 1` for direct subtypes only).

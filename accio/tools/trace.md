@@ -1,1 +1,1 @@
-- Inspect callers or callees: `{{JBCONTEXT}} trace Service.run --direction callers --depth 2` (or `--direction callees`).
+- Inspect callers or callees: `jbcontext trace Service.run --direction callers --depth 2` (or `--direction callees`).

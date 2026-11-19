@@ -1,1 +1,1 @@
-- Find uses of a declaration: `{{JBCONTEXT}} references Service.run` or `{{JBCONTEXT}} references --at src/Service.kt:12`. Use `--resolved` for uses tied by a type or import.
+- Who uses a declaration: `jbcontext references Service.run` or `jbcontext references --at src/Service.kt:12`. Each use is labelled (call, read, write, import); `--resolved` keeps only the uses a type or an import ties to it, `--files` lists the files with counts.

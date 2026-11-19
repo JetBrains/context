@@ -1,1 +1,1 @@
-- Find filenames and paths: `{{JBCONTEXT}} files '**/*Test.kt'`. Accepts substrings or globs.
+- Find filenames and paths: `jbcontext files '**/*Test.kt'`. Accepts substrings or globs.

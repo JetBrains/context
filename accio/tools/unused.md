@@ -1,1 +1,1 @@
-- Find potentially unused declarations: `{{JBCONTEXT}} unused --scope src/`. Results are leads to verify, not proof that deletion is safe.
+- Find potentially unused declarations: `jbcontext unused --scope src/`. Results are leads to verify, not proof that deletion is safe.
