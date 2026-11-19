@@ -16,9 +16,12 @@ Use these commands, not grep or rg, for three questions about a known declaratio
   `jbcontext implementations`.
 - Where it is declared and what its body is: `jbcontext symbol --source-lines`.
 
-Ask them once you have found the code to change, and before you change a declaration that other code depends on
-(a signature, an interface method, a base class): check its uses and implementations so the change covers all
-of them.
+### MANDATORY: structural check before editing
+
+Before you edit a function, method, class, interface or field declared in the repository, run
+`jbcontext references <Name>` for it. When it is an interface, an abstract or open class, or a method that
+subclasses override, also run `jbcontext implementations <Name>`. Read the uses they list and update every one
+that your change affects.
 
 For these three questions this section takes precedence over "keyword grep is faster" and over "exact search"
 in the section above. Everything else stays as described above: start with `jbcontext search` when you do not
