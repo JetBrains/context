@@ -1,0 +1,1 @@
+jbcontext is not logged in: "jbcontext search" and other jbcontext tools will fail in this session. Do not retry them; use grep and local file reads instead. The user has already been told to run "jbcontext login".
