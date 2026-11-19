@@ -25,6 +25,11 @@ export type JbIndex =
   | { state: 'none'; branch: string }
   | { state: 'unavailable'; reason: string }
 
+// Where the indexed snapshots `jbcontext status` reports are kept: on the server, or on
+// this machine with `runtime.storage local`. Local changes (the overlay `jbcontext watch`
+// keeps) are not among them.
+export type IndexStorage = 'remote' | 'local'
+
 // Today's exploration in this repository's Claude sessions, from `jbcontext analyze --status`.
 export type JbSavings = {
   sessions: number
@@ -50,14 +55,12 @@ export type JbSession = {
   jbcontextTokens: number
 }
 
-// The running turn, counted from its tool calls (its subagents' included) as they run.
+// The running turn, counted from the tool calls that ran (its subagents' included), each as it ends.
 export type JbTurn = {
   // Reads, greps, globs, listings and read-only shell commands, jbcontext's calls included.
   explorations: number
   jbcontextCalls: number
   jbcontextHits: number
-  // Local exploration calls since the turn's last jbcontext call.
-  streak: number
   // The jbcontext call running now, as the spinner says it.
   searching: string | null
   // The last jbcontext call's outcome, which the spinner says until `until`.
@@ -71,6 +74,7 @@ export type JbView = {
   otherSearches: number
   otherErrors: number
   index: JbIndex | null
+  storage: IndexStorage
   repositoryId: string | null
   // The repository the session runs in, as the stats files spell repositories.
   repoKey: string | null

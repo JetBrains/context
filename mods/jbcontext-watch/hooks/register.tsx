@@ -12,10 +12,12 @@ import {
   explorePrice,
   firstLine,
   formatDuration,
+  formatShare,
   formatTokens,
   formatUsd,
-  jbcontextShare,
-  jbcontextUsage,
+  indexLabel,
+  indexNote,
+  isWholeLine,
   mergeDays,
   normalizeRepo,
   parseSessionPhases,
@@ -27,9 +29,11 @@ import {
   scopeToRepo,
   searchLabel,
   statusLine,
+  tallyLines,
   touchesJbcontext,
+  usageOf,
 } from './model'
-import type { DayEvents, JbcontextUsage, RepoEvents, SessionStatus } from './model'
+import type { DayEvents, JbcontextUsage, RepoEvents, SessionStatus, UsageTally } from './model'
 
 const PANE = 'jbcontext'
 const STATS_POLL_MS = 5_000
@@ -39,9 +43,7 @@ const KEPT = 200
 const MAX_SESSIONS_SCANNED = 40
 const PRICE_KEY = 'explorePrice'
 const PRICE_RETRY_MS = 60 * 60 * 1000
-// Local exploration calls in a row, with the repository indexed, that turn the band's
-// nudge on; and how long the spinner says how a jbcontext call went.
-const NUDGE_STREAK = 6
+// How long the spinner says how a jbcontext call went.
 const RESULT_SHOWN_MS = 4_000
 
 const view = atom({ plugin: 'jbcontext-watch', key: 'view' } as const, null as JbView | null)
@@ -52,7 +54,6 @@ const EMPTY_TURN: JbTurn = {
   explorations: 0,
   jbcontextCalls: 0,
   jbcontextHits: 0,
-  streak: 0,
   searching: null,
   result: null,
 }
@@ -63,6 +64,7 @@ const EMPTY: JbView = {
   otherSearches: 0,
   otherErrors: 0,
   index: null,
+  storage: 'remote',
   repositoryId: null,
   repoKey: null,
   indexingSince: null,
@@ -88,11 +90,18 @@ let isStatusRunning = false
 let isSavingsRunning = false
 let isPriceRunning = false
 const sessionCache = new Map<string, { mtimeMs: number; status: SessionStatus | null }>()
-const usageCache = new Map<string, { stamp: string; usage: JbcontextUsage }>()
-let measuring: Promise<JbSession | null> | null = null
-// The exploring tokens the last line under an answer showed, so a turn that explored
-// nothing adds no line.
-let shownTokens: { sessionId: string; tokens: number } | null = null
+// Each transcript's jbcontext usage so far, read up to `offset`; `rest` is the start of a
+// line whose end has not been read yet. `reading` keeps a transcript's reads in order.
+const transcriptTallies = new Map<string, { offset: number; rest: string; tally: UsageTally; reading: Promise<unknown> }>()
+// The most one `$.fs.read` may answer.
+const READ_LIMIT = 4 * 1024 * 1024
+// Background measurements run one at a time; asking during one queues one more.
+let refreshing: Promise<void> | null = null
+let isRefreshQueued = false
+// Measurements are numbered as they start, so one that ends after a later one does not
+// overwrite its figures.
+let measureSeq = 0
+let patchedSeq = 0
 
 async function patch($: EngineInterface, fn: (current: JbView) => Partial<JbView>) {
   const written = await update($, view, current => {
@@ -322,19 +331,52 @@ async function refreshSavingsIfShown($: EngineInterface) {
   if (await isPaneOpen($)) await refreshSavings($)
 }
 
-async function transcriptUsage($: EngineInterface, path: string, size: number, mtimeMs: number) {
-  const stamp = `${size}:${mtimeMs}`
-  const cached = usageCache.get(path)
-  if (cached?.stamp === stamp) return cached.usage
-  const usage = jbcontextUsage(await $.fs.read(path).catch(() => ''))
-  usageCache.set(path, { stamp, usage })
-  return usage
+// A transcript only grows, so it is read on from where the last read of it stopped, in
+// ranges a read may answer (a long session's runs to tens of MB), its lines tallied once
+// whole. A range that cuts a character reads it as U+FFFD, harmless inside a JSON string.
+// A read that fails leaves the tally where it was, to go on from next time.
+function transcriptUsage($: EngineInterface, path: string, size: number): Promise<JbcontextUsage> {
+  let known = transcriptTallies.get(path)
+  if (known === undefined) {
+    known = { offset: 0, rest: '', tally: new Map(), reading: Promise.resolve() }
+    transcriptTallies.set(path, known)
+  }
+  const one = known
+  const run = one.reading.catch(() => undefined).then(async () => {
+    let upTo = size
+    try {
+      // A size taken before a later read went further only looks shorter: the file's own
+      // says whether it was rewritten, and then it is read again from the start.
+      if (upTo < one.offset) {
+        upTo = (await $.fs.stat(path)).size
+        if (upTo < one.offset) Object.assign(one, { offset: 0, rest: '', tally: new Map() })
+      }
+      while (one.offset < upTo) {
+        const length = Math.min(READ_LIMIT, upTo - one.offset)
+        const text = one.rest + (await $.fs.read(path, { offset: one.offset, length }))
+        one.offset += length
+        const end = text.lastIndexOf('\n') + 1
+        tallyLines(one.tally, text.slice(0, end))
+        one.rest = text.slice(end)
+      }
+      if (one.rest !== '' && isWholeLine(one.rest)) {
+        tallyLines(one.tally, one.rest)
+        one.rest = ''
+      }
+    } catch {
+      // Not readable now: what was read stands.
+    }
+    return usageOf(one.tally)
+  })
+  one.reading = run
+  return run
 }
 
-// `jbcontext analyze` reads a projects folder, so the session's transcript and each of
-// its subagents' are linked into one of their own, the subagents as sessions beside it:
-// the CLI counts a subagent's tokens only in a transcript of its own.
-async function measureSession($: EngineInterface): Promise<JbSession | null> {
+type Transcript = { path: string; size: number }
+type SessionTranscripts = { sessionId: string; transcripts: Transcript[] }
+
+// This session's transcript and each of its subagents'.
+async function sessionTranscripts($: EngineInterface): Promise<SessionTranscripts | null> {
   if (claudeHome === '') return null
   const sessionId = await $.session.id()
   const projectDir = `${claudeHome}/projects/${claudeProjectDir(cwd)}`
@@ -343,11 +385,30 @@ async function measureSession($: EngineInterface): Promise<JbSession | null> {
   if (mainStat?.kind !== 'file') return null
   const subagentDir = `${projectDir}/${sessionId}/subagents`
   const transcripts = [
-    { path: main, size: mainStat.size, mtimeMs: mainStat.mtimeMs },
+    { path: main, size: mainStat.size },
     ...(await $.fs.list(subagentDir).catch(() => []))
       .filter(entry => entry.kind === 'file' && entry.name.endsWith('.jsonl'))
-      .map(entry => ({ path: `${subagentDir}/${entry.name}`, size: entry.size, mtimeMs: entry.mtimeMs })),
+      .map(entry => ({ path: `${subagentDir}/${entry.name}`, size: entry.size })),
   ]
+  return { sessionId, transcripts }
+}
+
+async function sessionUsage($: EngineInterface, transcripts: Transcript[]): Promise<JbcontextUsage> {
+  const usages = await Promise.all(transcripts.map(one => transcriptUsage($, one.path, one.size)))
+  return {
+    calls: usages.reduce((sum, usage) => sum + usage.calls, 0),
+    tokens: usages.reduce((sum, usage) => sum + usage.tokens, 0),
+  }
+}
+
+// `jbcontext analyze` reads a projects folder, so the session's transcript and each of
+// its subagents' are linked into one of their own, the subagents as sessions beside it:
+// the CLI counts a subagent's tokens only in a transcript of its own.
+async function measureSession($: EngineInterface, given?: SessionTranscripts): Promise<JbSession | null> {
+  const seq = ++measureSeq
+  const found = given ?? (await sessionTranscripts($))
+  if (found === null) return null
+  const { sessionId, transcripts } = found
 
   const linkRoot = `${tempHome}/jbcontext-watch/${sessionId}`
   const links = `${linkRoot}/session`
@@ -364,24 +425,42 @@ async function measureSession($: EngineInterface): Promise<JbSession | null> {
   const phases = analyze.exitCode === 0 ? parseSessionPhases(analyze.stdout) : null
   if (phases === null) return null
 
-  const usages = await Promise.all(transcripts.map(one => transcriptUsage($, one.path, one.size, one.mtimeMs)))
-  const session: JbSession = {
-    sessionId,
-    ...phases,
-    jbcontextCalls: usages.reduce((sum, usage) => sum + usage.calls, 0),
-    jbcontextTokens: usages.reduce((sum, usage) => sum + usage.tokens, 0),
+  const usage = await sessionUsage($, transcripts)
+  const session: JbSession = { sessionId, ...phases, jbcontextCalls: usage.calls, jbcontextTokens: usage.tokens }
+  // Written only while it is still this session's (not after a /clear or /resume), and
+  // when no later measurement has written meanwhile.
+  const isCurrent = sessionId === (await $.session.id())
+  if (isCurrent && seq > patchedSeq) {
+    patchedSeq = seq
+    await patch($, () => ({ session }))
   }
-  await patch($, () => ({ session }))
   return session
 }
 
-function measureSessionOnce($: EngineInterface): Promise<JbSession | null> {
-  measuring ??= measureSession($)
-    .catch(() => null)
-    .finally(() => {
-      measuring = null
-    })
-  return measuring
+// For the pane and the status line, in the background: one measurement at a time, and a
+// call during one gets another after it, so the figures catch up with the transcripts.
+function refreshSession($: EngineInterface): void {
+  if (refreshing !== null) {
+    isRefreshQueued = true
+    return
+  }
+  refreshing = (async () => {
+    try {
+      do {
+        isRefreshQueued = false
+        await measureSession($).catch(() => null)
+      } while (isRefreshQueued)
+    } finally {
+      refreshing = null
+    }
+  })()
+}
+
+// At the end of a turn: one of its own, never one already running, which may have read
+// the transcripts before the turn's calls; and waiting on it would spend the hook's
+// budget, which stops only for the hook's own `$` calls.
+function measureSessionFresh($: EngineInterface, found: SessionTranscripts): Promise<JbSession | null> {
+  return measureSession($, found).catch(() => null)
 }
 
 function searchKey(search: JbSearch): string {
@@ -461,18 +540,20 @@ export const register: Register = on => {
     }
     void refreshStatus($)
     void refreshSavings($)
-    void measureSessionOnce($)
+    refreshSession($)
     await $.ui.open({ id: PANE, title: 'jbcontext' })
     return { text: 'jbcontext pane opened.' }
   })
 
+  // A subagent's turn runs inside the main one, whose counts go on through it.
   on('turn.start', async ($, e, next) => {
-    await update($, turnState, () => EMPTY_TURN)
+    if (e.agentId === undefined) await update($, turnState, () => EMPTY_TURN)
     return next(e)
   })
 
-  // Counts the turn's exploration as it runs, says in the spinner what jbcontext is
-  // searching for, and marks a `jbcontext index` run while it lasts.
+  // Counts the turn's exploration, each call once it ended (a refused one never reached
+  // jbcontext; one that threw is reported as failed), says in the spinner what jbcontext
+  // is searching for, and marks a `jbcontext index` run while it lasts.
   on('tool.call', async ($, e, next) => {
     const kind = explorationKind(e.tool, e)
     const touch = e.tool === 'Bash' ? touchesJbcontext(e.command) : kind === 'jbcontext' ? 'other' : null
@@ -480,24 +561,25 @@ export const register: Register = on => {
 
     const startedAt = await $.clock.now()
     const label = kind === 'jbcontext' ? searchLabel(e.tool, e) : null
-    if (kind !== null) {
-      await patchTurn($, turn => ({
-        explorations: turn.explorations + 1,
-        jbcontextCalls: turn.jbcontextCalls + (kind === 'jbcontext' ? 1 : 0),
-        streak: kind === 'jbcontext' ? 0 : turn.streak + 1,
-        searching: label ?? turn.searching,
-      }))
-    }
+    if (label !== null) await patchTurn($, () => ({ searching: label }))
     if (touch === 'index') await patch($, () => ({ indexingSince: startedAt }))
+    let isRefused = false
     let isError = true
     try {
       const result = await next(e)
-      isError = 'deny' in result || result.isError === true
+      isRefused = result.deny !== undefined
+      isError = isRefused || result.isError === true
       return result
     } finally {
+      if (kind !== null && !isRefused) {
+        await patchTurn($, turn => ({
+          explorations: turn.explorations + 1,
+          jbcontextCalls: turn.jbcontextCalls + (kind === 'jbcontext' ? 1 : 0),
+        }))
+      }
       if (label !== null) {
         await patchTurn($, turn => ({ searching: turn.searching === label ? null : turn.searching }))
-        void finishSearch($, startedAt, isError)
+        if (!isRefused) void finishSearch($, startedAt, isError)
       }
       if (touch === 'index') await patch($, () => ({ indexingSince: null }))
       if (touch !== null && label === null) void refreshStats($)
@@ -505,27 +587,48 @@ export const register: Register = on => {
     }
   })
 
-  // Beneath an answer whose turn explored, the session's exploration so far; once the
-  // session ends, the last of these lines stands as its summary.
+  // Beneath an answer whose turn called jbcontext (its subagents included), the session's
+  // jbcontext share so far; once the session ends, the last of these lines stands as its
+  // summary.
   on('turn.complete', async ($, e, next) => {
     void refreshStats($)
     const result = await next(e)
     if (!isInteractive || e.agentId !== undefined || result.text !== e.answer) return result
-    const session = await measureSessionOnce($)
-    if (session === null || session.exploreTokens === 0) return result
-    if (shownTokens?.sessionId === session.sessionId && shownTokens.tokens === session.exploreTokens) return result
-    shownTokens = { sessionId: session.sessionId, tokens: session.exploreTokens }
+    // The transcripts are cheap to read and `jbcontext analyze` is not: a session that has
+    // not called jbcontext shows no figures, so it is measured only for an open pane.
+    const found = await sessionTranscripts($).catch(() => null)
+    if (found === null) return result
+    if ((await sessionUsage($, found.transcripts)).calls === 0) {
+      if (await isPaneOpen($)) refreshSession($)
+      return result
+    }
+    // A turn without a jbcontext call adds no line; the status line's share is kept
+    // current without holding the turn's end.
+    if (((await read($, turnState))?.jbcontextCalls ?? 0) === 0) {
+      refreshSession($)
+      return result
+    }
+    const session = await measureSessionFresh($, found)
+    if (session === null || session.exploreTokens === 0 || session.jbcontextCalls === 0) return result
     return { ...result, text: describeSession(session) }
   })
 
+  // Another session takes this one's place: its figures go with it, and no measurement
+  // started before the end, while the session's id may still be the old one's, writes.
   on('session.end', async ($, e, next) => {
-    if (e.reason === 'clear') await patch($, () => ({ session: null }))
-    return next(e)
+    const isReplaced = e.reason === 'clear' || e.reason === 'resume'
+    const forget = () => {
+      patchedSeq = measureSeq
+      return patch($, () => ({ session: null }))
+    }
+    if (isReplaced) await forget()
+    const ended = await next(e)
+    if (isReplaced) await forget()
+    return ended
   })
 
-  // While Claude works: the turn's exploration so far, a nudge when it greps on and on in
-  // an indexed repository, the index when it is not current, and a fresh error. Nothing
-  // when there is nothing of these to say.
+  // While Claude works: the turn's exploration once it called jbcontext, an index search
+  // cannot use, and a fresh error. Nothing when there is nothing of these to say.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || !e.props.isWorking || (await read($, isBandHidden))) return next(e)
     const current = await read($, view)
@@ -536,44 +639,34 @@ export const register: Register = on => {
     const error = current.errors[0]
     const isFreshError = error !== undefined && now - error.at < 60 * 60 * 1000
     const isIndexing = current.indexingSince !== null
-    const state = current.index?.state
+    const isTurnShown = turn.jbcontextCalls > 0
+    // Only what stops search: whichever snapshot answers is the pane's to say.
     const isIndexShown =
       !isIndexing &&
-      current.index !== null &&
-      state !== 'current' &&
-      !(current.index.state === 'unavailable' && current.index.reason === 'not a git repository')
-    const isNudge = (state === 'current' || state === 'stale') && turn.streak >= NUDGE_STREAK
-    if (!isIndexing && turn.explorations === 0 && !isIndexShown && !isFreshError) return next(e)
+      (current.index?.state === 'none' ||
+        (current.index?.state === 'unavailable' && current.index.reason !== 'not a git repository'))
+    if (!isIndexing && !isTurnShown && !isIndexShown && !isFreshError) return next(e)
 
     const { Box, Text } = $.ui.resolve(e)
     const index = describeIndex(current.index, now)
+    // A failure is not about a snapshot; the rest says which index it describes.
+    const indexText = current.index?.state === 'unavailable' ? index.text : `${indexLabel(current.storage)}: ${index.text}`
     return (
-      <Box
-        flexDirection="column"
-        width={e.props.bodyColumns}
-        borderStyle="round"
-        borderColor={isNudge ? 'warning' : 'inactive'}
-        paddingX={1}
-      >
+      <Box flexDirection="column" width={e.props.bodyColumns} borderStyle="round" borderColor="inactive" paddingX={1}>
         <Text wrap="truncate-end">
           <Text color="claude" bold>jbcontext</Text>
           {'  '}
           {isIndexing ? (
             <Text color="suggestion">indexing... {ago(current.indexingSince!, now).replace(' ago', '')}</Text>
-          ) : turn.explorations > 0 ? (
+          ) : isTurnShown ? (
             describeTurn(turn)
           ) : (
             ''
           )}
         </Text>
-        {isNudge && (
-          <Text color="warning" wrap="truncate-end">
-            {turn.streak} grep/read calls in a row without jbcontext; this repository is indexed
-          </Text>
-        )}
         {isIndexShown && (
           <Text color={index.color} wrap="truncate-end">
-            {index.text}
+            {indexText}
           </Text>
         )}
         {isFreshError && (
@@ -611,15 +704,19 @@ export const register: Register = on => {
     // `?? null`: a view written before this field existed outlives a reload.
     const session = current.session ?? null
     const price = savings?.usdPerToken ?? null
+    const label = indexLabel(current.storage)
 
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
-        <Text bold>Index</Text>
+        <Text bold>{label.charAt(0).toUpperCase() + label.slice(1)}</Text>
         {current.repositoryId && <Text dimColor wrap="truncate-end">{current.repositoryId}</Text>}
         {current.indexingSince !== null && (
           <Text color="suggestion">indexing in this session since {ago(current.indexingSince, now)}</Text>
         )}
         <Text color={index.color} wrap="wrap">{index.text}</Text>
+        {current.index !== null && current.index.state !== 'unavailable' && (
+          <Text dimColor wrap="wrap">{indexNote(current.storage)}</Text>
+        )}
 
         <Text> </Text>
         <Text bold>This session</Text>
@@ -642,7 +739,7 @@ export const register: Register = on => {
         {session !== null && session.jbcontextCalls > 0 && (
           <Text color="claude" wrap="wrap">
             jbcontext: {session.jbcontextCalls} call{session.jbcontextCalls === 1 ? '' : 's'},{' '}
-            {formatTokens(session.jbcontextTokens)} tokens, {jbcontextShare(session)}% of exploring
+            {formatTokens(session.jbcontextTokens)} tokens, {formatShare(session)} of exploring
           </Text>
         )}
 

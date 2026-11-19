@@ -1,4 +1,4 @@
-import type { JbError, JbIndex, JbSearch, JbSession, JbTurn, JbView } from '../types'
+import type { IndexStorage, JbError, JbIndex, JbSearch, JbSession, JbTurn, JbView } from '../types'
 
 // The CLI's local stats format: one file per day,
 // `{ date, events: [...] }`, each event tagged by `type`.
@@ -110,10 +110,12 @@ type RawSnapshot = { revision?: string; branches?: string[]; createdAt?: number 
 type RawStatus = {
   repositoryId?: string
   message?: string
+  // Left out of the JSON when it is `remote`, the default.
+  storage?: string
   indices?: { indexAlias?: { name?: string }; snapshots?: RawSnapshot[] }[]
 }
 
-export type StatusSummary = { repositoryId: string | null; index: JbIndex }
+export type StatusSummary = { repositoryId: string | null; index: JbIndex; storage?: IndexStorage }
 
 export function parseStatus(text: string, head: string, branch: string): StatusSummary {
   let status: RawStatus
@@ -130,10 +132,11 @@ export function parseStatus(text: string, head: string, branch: string): StatusS
     .filter(snapshot => typeof snapshot.revision === 'string')
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
   const repositoryId = status.repositoryId ?? null
+  const storage: IndexStorage = status.storage === 'local' ? 'local' : 'remote'
 
   const exact = snapshots.find(snapshot => snapshot.revision === head)
   if (exact) {
-    return { repositoryId, index: { state: 'current', branch, revision: head, at: exact.createdAt ?? 0 } }
+    return { repositoryId, storage, index: { state: 'current', branch, revision: head, at: exact.createdAt ?? 0 } }
   }
 
   const onBranch = snapshots.find(snapshot =>
@@ -142,6 +145,7 @@ export function parseStatus(text: string, head: string, branch: string): StatusS
   if (onBranch) {
     return {
       repositoryId,
+      storage,
       index: { state: 'stale', branch, head, revision: onBranch.revision!, at: onBranch.createdAt ?? 0 },
     }
   }
@@ -150,11 +154,12 @@ export function parseStatus(text: string, head: string, branch: string): StatusS
   if (latest) {
     return {
       repositoryId,
+      storage,
       index: { state: 'other', branch, head, revision: latest.revision!, at: latest.createdAt ?? 0 },
     }
   }
 
-  return { repositoryId, index: { state: 'none', branch } }
+  return { repositoryId, storage, index: { state: 'none', branch } }
 }
 
 // `ssh://git@github.com/JetBrains/x.git`, `git@github.com:JetBrains/x.git` and
@@ -336,25 +341,35 @@ export function describeTurn(turn: JbTurn): string {
   return `this turn: ${calls} · ${jbcontext}`
 }
 
-// The status line under the prompt: the index of this branch, and once a turn has been
-// measured, how much of the session's exploring went through jbcontext.
+// What the snapshots `jbcontext status` reports are: the remote (or on-device) index
+// alone. Local changes reach search through the overlay, which none of them shows.
+// `undefined`: a view written before the field existed outlives a reload.
+export function indexLabel(storage: IndexStorage | undefined): string {
+  return storage === 'local' ? 'on-device index' : 'remote index'
+}
+
+export function indexNote(storage: IndexStorage | undefined): string {
+  const where = storage === 'local' ? 'on this machine' : 'on the server'
+  return `Snapshots ${where}. Commits not indexed yet and uncommitted edits are searched through the local overlay (\`jbcontext watch\`), which this pane doesn’t show yet: \`jbcontext status\` reports it.`
+}
+
+// The status line under the prompt: shortly, whether jbcontext can search this repository
+// (which snapshot answers is the pane's: search falls back to an older one, or another
+// branch's, by itself), and once a turn has been measured, how much of the session's
+// exploring went through jbcontext, when any did.
 export function statusLine(view: JbView): string | undefined {
   const index = view.index
   let head: string
   if (view.indexingSince !== null) head = 'jbcontext · indexing…'
   else if (index === null) return undefined
-  else if (index.state === 'current') head = `jbcontext ✓ ${index.branch} indexed`
-  else if (index.state === 'stale') head = `jbcontext ⚠ ${index.branch} HEAD not indexed`
-  else if (index.state === 'other') head = `jbcontext ⚠ ${index.branch} not indexed`
   else if (index.state === 'none') head = 'jbcontext ✗ repository not indexed'
+  else if (index.state !== 'unavailable') head = `jbcontext · ${indexLabel(view.storage)} ✓`
   else if (index.reason === 'not a git repository') return undefined
   else head = `jbcontext ✗ ${index.reason.length > 60 ? `${index.reason.slice(0, 59)}…` : index.reason}`
 
   const session = view.session ?? null
-  if (session === null || session.exploreTokens === 0) return head
-  return session.jbcontextCalls === 0
-    ? `${head} · session: jbcontext not used`
-    : `${head} · session: ${jbcontextShare(session)}% of exploring via jbcontext`
+  if (session === null || session.exploreTokens === 0 || session.jbcontextCalls === 0) return head
+  return `${head} · session: ${formatShare(session)} of exploring via jbcontext`
 }
 
 // The tokens billed for the responses that called jbcontext, the way `jbcontext analyze`
@@ -362,8 +377,18 @@ export function statusLine(view: JbView): string | undefined {
 // output; a response that also called other tools is split evenly among its calls.
 // A response spans several transcript lines, one per content block, under one id.
 export function jbcontextUsage(transcript: string): JbcontextUsage {
-  const responses = new Map<string, { billed: number; tools: number; jbcontext: number }>()
-  for (const line of transcript.split('\n')) {
+  const tally: UsageTally = new Map()
+  tallyLines(tally, transcript)
+  return usageOf(tally)
+}
+
+// Each response's billed tokens and tool calls, jbcontext's among them, by message id.
+export type UsageTally = Map<string, { billed: number; tools: number; jbcontext: number }>
+
+// Adds whole transcript lines to `tally`: a line cut in two would be lost, or counted
+// twice.
+export function tallyLines(responses: UsageTally, text: string): void {
+  for (const line of text.split('\n')) {
     if (!line.includes('"assistant"')) continue
     let entry
     try {
@@ -387,7 +412,9 @@ export function jbcontextUsage(transcript: string): JbcontextUsage {
     }
     responses.set(message.id, response)
   }
+}
 
+export function usageOf(responses: UsageTally): JbcontextUsage {
   let calls = 0
   let tokens = 0
   for (const response of responses.values()) {
@@ -398,18 +425,33 @@ export function jbcontextUsage(transcript: string): JbcontextUsage {
   return { calls, tokens: Math.round(tokens) }
 }
 
+// Whether text holds one whole transcript line: the last line of a file not yet followed
+// by its newline. A line cut short is never valid JSON.
+export function isWholeLine(text: string): boolean {
+  try {
+    JSON.parse(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function jbcontextShare(session: JbSession): number {
   if (session.exploreTokens <= 0) return 0
   return Math.min(100, Math.round((session.jbcontextTokens / session.exploreTokens) * 100))
 }
 
+// The share as shown: `<1%` for a share that rounds to nothing, so a session that used
+// jbcontext in its exploring never reads as 0%.
+export function formatShare(session: JbSession): string {
+  const share = jbcontextShare(session)
+  return share === 0 && session.jbcontextTokens > 0 && session.exploreTokens > 0 ? '<1%' : `${share}%`
+}
+
+// The line beneath an answer, for a session that used jbcontext.
 export function describeSession(session: JbSession): string {
-  const costShare = session.totalUsd > 0 ? ` (${Math.round((session.exploreUsd / session.totalUsd) * 100)}% of ${formatUsd(session.totalUsd)})` : ''
-  const jbcontext =
-    session.jbcontextCalls === 0
-      ? 'jbcontext not used'
-      : `jbcontext ${session.jbcontextCalls} call${session.jbcontextCalls === 1 ? '' : 's'}, ${jbcontextShare(session)}% of exploring tokens`
-  return `jbcontext · this session explored ${formatTokens(session.exploreTokens)} tokens in ${formatDuration(session.exploreMs)}, ≈${formatUsd(session.exploreUsd)}${costShare} · ${jbcontext}`
+  const calls = `${session.jbcontextCalls} call${session.jbcontextCalls === 1 ? '' : 's'}`
+  return `jbcontext · ${calls}, ${formatShare(session)} of this session’s exploring tokens (${formatTokens(session.exploreTokens)} in ${formatDuration(session.exploreMs)})`
 }
 
 export function formatDuration(ms: number): string {
@@ -459,21 +501,28 @@ export function short(revision: string): string {
   return revision.slice(0, 8)
 }
 
-export function describeIndex(index: JbIndex | null, now: number): { text: string; color: string } {
+// The index's snapshots, told against HEAD, for the pane. One of another commit is said
+// plainly, not as a warning: search uses it by itself, the overlay may cover the
+// difference, and nothing here can tell yet. `HEAD` is the branch of a detached HEAD.
+export function describeIndex(index: JbIndex | null, now: number): { text: string; color: string | undefined } {
   if (index === null) return { text: 'checking index…', color: 'inactive' }
   switch (index.state) {
-    case 'current':
-      return { text: `${index.branch} @ ${short(index.revision)} indexed ${ago(index.at, now)}`, color: 'success' }
+    case 'current': {
+      const of = index.branch === 'HEAD' ? '' : ` of ${index.branch}`
+      return { text: `HEAD ${short(index.revision)}${of} indexed ${ago(index.at, now)}`, color: 'success' }
+    }
     case 'stale':
       return {
-        text: `${index.branch} HEAD ${short(index.head)} not indexed; branch snapshot ${short(index.revision)} from ${ago(index.at, now)}`,
-        color: 'warning',
+        text: `HEAD ${short(index.head)} not indexed; newest snapshot of ${index.branch}: ${short(index.revision)}, ${ago(index.at, now)}`,
+        color: undefined,
       }
-    case 'other':
+    case 'other': {
+      const branch = index.branch === 'HEAD' ? '' : `${index.branch} has no snapshots; `
       return {
-        text: `${index.branch} not indexed; newest snapshot ${short(index.revision)} from ${ago(index.at, now)}`,
-        color: 'warning',
+        text: `HEAD ${short(index.head)} not indexed; ${branch}newest snapshot: ${short(index.revision)}, ${ago(index.at, now)}`,
+        color: undefined,
       }
+    }
     case 'none':
       return { text: 'no snapshots for this repository; run `jbcontext index`', color: 'error' }
     case 'unavailable':
