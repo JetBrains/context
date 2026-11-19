@@ -2,6 +2,7 @@
   "$comment": [
     "Cell claude-code+claude-opus-5-5+medium of Ultimate Private, exported from the Agentic Benchmark page on the run pair below.",
     "jbcontext 0.9.20.1504 on the release channel, claude-code 2.1.317, flags --auto.",
+    "Warning: Older-run fallback: using build 7596605 instead of latest stable build 7622688; newer run pairs were excluded.",
     "The arm run WITH jbcontext: TeamCity build #73.",
     "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
     "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
