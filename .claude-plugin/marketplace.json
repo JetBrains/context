@@ -1,0 +1,14 @@
+{
+  "name": "jetbrains-context",
+  "owner": {
+    "name": "JetBrains"
+  },
+  "description": "Claude Code plugins for JetBrains Context (jbcontext)",
+  "plugins": [
+    {
+      "name": "jbcontext-watch",
+      "source": "./mods/jbcontext-watch",
+      "description": "Shows jbcontext's index status, latest searches and errors, and today's estimated savings for the current repository"
+    }
+  ]
+}

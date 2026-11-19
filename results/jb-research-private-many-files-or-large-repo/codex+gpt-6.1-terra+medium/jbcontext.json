@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "Cell codex+gpt-6.1-terra+medium of BenchRoom (many files, large repos), exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.19.1421 on the release channel, codex 0.167.0, flags --auto.",
+    "Warning: Missing metrics: costUsd — unavailable for comparison, not published.",
+    "The arm run WITH jbcontext: TeamCity build #65.",
+    "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
+    "toolCalls: mean tool calls per task, from the junie_number_tool_calls_avg build statistic",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "jbcontext",
+  "dataset": "jb-research-private-many-files-or-large-repo",
+  "harness": "codex",
+  "model": "gpt-6.1-terra",
+  "effort": "medium",
+  "integration": "--auto",
+  "taskCount": 396,
+  "resolvedRate": 0.4192,
+  "run": {
+    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsJbResearchPrivateSweBenchAllValidIdsAllIterationsManyFilesOrLargeRepoWithSeedsEmbark/7567138",
+    "startedAt": "20261108T195535+0000"
+  },
+  "metrics": {
+    "turns": 0.84,
+    "toolCalls": 49.63,
+    "latencyMs": 199119.0
+  }
+}
