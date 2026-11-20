@@ -31,3 +31,15 @@ Read-only exploration subagents that run several `jbcontext search` queries in t
 |---|---|
 | `context-explorer` (Claude) | `agents/claude/context-explorer.md` — Claude subagent, invoked via `Task(subagent_type='context-explorer', ...)`. |
 | `context_explorer` (Codex) | `agents/codex/context-explorer.toml` — Codex custom agent (install under `~/.codex/agents/` or `.codex/agents/`). Codex spawns subagents only when asked, so request it directly, e.g. "use `context_explorer` to map the auth flow". |
+
+### Hooks
+
+Text payloads for the hooks that `jbcontext setup-agent` installs. The CLI embeds these files and loads them by name when a hook fires (`jbcontext hook <event>`), so the wording can change without a CLI release; a file under `hooks/<agent>/` overrides the generic one for that agent. The `*.sh` scripts are an earlier, standalone version of the tool-watching hooks and are not used by the CLI.
+
+| File | Hook | Purpose |
+|---|---|---|
+| `session-start-auth.txt` | SessionStart (`hook session-start-auth`) | Shown to the user when the CLI is not logged in: semantic search is unavailable, run `jbcontext login`. Printed only in that case; a healthy session prints nothing. |
+| `session-start-auth-context.txt` | SessionStart (`hook session-start-auth`) | The matching one-line context for the agent: do not retry `jbcontext search` or `code_search`, the user has been told to log in. |
+| `session-start-instruct.txt` | SessionStart (`hook session-start-instruct`, opt-in) | Reminds the agent to start code discovery with one broad `jbcontext search`. |
+| `user-prompt-submit.txt` | UserPromptSubmit (`hook user-prompt-submit`) | The same reminder on each prompt. |
+| `pre-tool-use.txt` | PreToolUse (`hook pre-tool-use`) | The reminder when the agent reaches for `grep`/`rg`/`find` before a semantic search. |
