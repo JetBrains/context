@@ -1,9 +1,8 @@
 {
   "$comment": [
     "Cell codex+gpt-6.1-sol+medium of Ultimate Private, exported from the Agentic Benchmark page on the run pair below.",
-    "jbcontext 0.9.18.1257 on the release channel, codex 0.166.0, flags --auto.",
-    "Warning: Older-run fallback: using build 7503593 instead of latest stable build 7554452; newer run pairs were excluded.",
-    "The arm run WITHOUT jbcontext: TeamCity build #2, the baseline of this declared configuration.",
+    "jbcontext 0.9.21.1593 on the release channel, codex 0.167.2, flags --auto.",
+    "The arm run WITHOUT jbcontext: TeamCity build #88, the baseline of this declared configuration.",
     "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
     "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
     "toolCalls: mean tool calls per task, from the junie_number_tool_calls_avg build statistic",
@@ -16,15 +15,15 @@
   "model": "gpt-6.1-sol",
   "effort": "medium",
   "taskCount": 126,
-  "resolvedRate": 0.7222,
+  "resolvedRate": 0.7063,
   "run": {
-    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsUltimateSweBenchValidLiteOnlyPrivateWithSeedsEmbark/7502592",
-    "startedAt": "20261103T211344+0000"
+    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsUltimateSweBenchValidLiteOnlyPrivateWithSeedsEmbark/7625386",
+    "startedAt": "20261112T180015+0000"
   },
   "metrics": {
-    "costUsd": 0.4357,
+    "costUsd": 0.4181,
     "turns": 1.0,
-    "toolCalls": 69.06,
-    "latencyMs": 625381.0
+    "toolCalls": 67.8,
+    "latencyMs": 607333.0
   }
 }

@@ -2,7 +2,8 @@
   "$comment": [
     "Cell claude-code+claude-opus-5-5+medium of Ultimate Private, exported from the Agentic Benchmark page on the run pair below.",
     "jbcontext 0.9.20.1504 on the release channel, claude-code 2.1.317, flags --auto.",
-    "The arm run WITHOUT jbcontext: TeamCity build #3, the baseline of this declared configuration.",
+    "Warning: Older-run fallback: using build 7596605 instead of latest stable build 7622688; newer run pairs were excluded.",
+    "The arm run WITHOUT jbcontext: TeamCity build #72, the baseline of this declared configuration.",
     "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
     "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
     "toolCalls: mean tool calls per task, from the junie_number_tool_calls_avg build statistic",
@@ -15,15 +16,15 @@
   "model": "claude-opus-5-5",
   "effort": "medium",
   "taskCount": 126,
-  "resolvedRate": 0.7063,
+  "resolvedRate": 0.7143,
   "run": {
-    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsUltimateSweBenchValidLiteOnlyPrivateWithSeedsEmbark/7501929",
-    "startedAt": "20261103T213713+0000"
+    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsUltimateSweBenchValidLiteOnlyPrivateWithSeedsEmbark/7596256",
+    "startedAt": "20261110T101322+0000"
   },
   "metrics": {
-    "costUsd": 0.3248,
-    "turns": 12.85,
-    "toolCalls": 47.5,
-    "latencyMs": 243460.0
+    "costUsd": 0.2977,
+    "turns": 12.71,
+    "toolCalls": 45.83,
+    "latencyMs": 195032.0
   }
 }
