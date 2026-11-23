@@ -266,7 +266,7 @@ export function isJbcontextCall(name: string, input: unknown): boolean {
   return /(?:^|[;&|(\n])\s*(?:\S*\/)?jbcontext\s+(?:--?\S+\s+)*(?:search|repos)\b/.test(unquote(command))
 }
 
-function unquote(command: string): string {
+export function unquote(command: string): string {
   return command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''")
 }
 
@@ -282,10 +282,7 @@ export function explorationKind(tool: string, args: unknown): 'jbcontext' | 'loc
   if (tool !== 'Bash') return null
   const command = (args as { command?: unknown } | null)?.command
   if (typeof command !== 'string') return null
-  const segment = unquote(command)
-    .split(/&&|\|\||;|\n/)
-    .map(part => part.trim().split(/\s+/).filter(word => !/^[A-Za-z_]\w*=/.test(word)))
-    .find(words => words.length > 0 && words[0] !== 'cd')
+  const segment = commandSegments(command)[0]
   if (!segment) return null
   const name = segment[0]!.split('/').pop()!
   if (READ_ONLY_COMMANDS.has(name)) return 'local'
@@ -297,13 +294,39 @@ export function explorationKind(tool: string, args: unknown): 'jbcontext' | 'loc
   return null
 }
 
+// A shell command's commands, split at `&&`, `||`, `;` and newlines, each as its words
+// with leading `VAR=` assignments dropped; `cd` steps and empty parts left out. Quoted
+// strings are blanked first, so an operator inside quotes splits nothing.
+export function commandSegments(command: string): string[][] {
+  return unquote(command)
+    .split(/&&|\|\||;|\n/)
+    .map(part => part.trim().split(/\s+/).filter(word => word.length > 0 && !/^[A-Za-z_]\w*=/.test(word)))
+    .filter(words => words.length > 0 && words[0] !== 'cd')
+}
+
+// A jbcontext call that searches code: a jbcontext MCP tool other than a repository
+// finder, or a shell `jbcontext search`.
+export function isJbcontextSearch(name: string, input: unknown): boolean {
+  if (name.startsWith('mcp__')) return /jbcontext|embark/i.test(name) && !/repositor/i.test(name)
+  if (name !== 'Bash') return false
+  const command = (input as { command?: unknown } | null)?.command
+  if (typeof command !== 'string') return false
+  return /(?:^|[;&|(\n])\s*(?:\S*\/)?jbcontext\s+(?:--?\S+\s+)*search\b/.test(unquote(command))
+}
+
 // What the spinner says while a jbcontext call runs: `Searching jbcontext: "query"`.
 export function searchLabel(tool: string, args: unknown): string {
   const record = (args ?? {}) as Record<string, unknown>
   const isRepos = tool === 'Bash' ? /\bjbcontext\s+(?:--?\S+\s+)*repos\b/.test(unquote(String(record.command ?? ''))) : /repositor/i.test(tool)
-  const query = tool === 'Bash' ? shellQuery(String(record.command ?? '')) : firstString(record.text, record.query, record.q)
+  const query = searchQuery(tool, args)
   const verb = isRepos ? 'Finding repositories in jbcontext' : 'Searching jbcontext'
   return query ? `${verb}: "${query.length > 60 ? `${query.slice(0, 59)}…` : query}"` : verb
+}
+
+// The query of a jbcontext call: the MCP tool's text argument, or the shell command's query.
+export function searchQuery(tool: string, args: unknown): string | null {
+  const record = (args ?? {}) as Record<string, unknown>
+  return tool === 'Bash' ? shellQuery(String(record.command ?? '')) : firstString(record.text, record.query, record.q)
 }
 
 function firstString(...values: unknown[]): string | null {

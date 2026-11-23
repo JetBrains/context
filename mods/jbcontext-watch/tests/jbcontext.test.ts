@@ -996,3 +996,118 @@ test('a transcript over 4 MiB is read in ranges, on from where the last read sto
   transcript = `${TRANSCRIPT}\n`
   expect(await turn('t5')).toBe('jbcontext · 2 calls, 20% of this session’s exploring tokens (4K in 1m 15s)')
 })
+
+const SEARCH_OUTPUT = [
+  '1. File: src/billing/RetryPolicy.kt',
+  '  Content:',
+  '     250|     fun delayFor(attempt: Int): Duration = base * 2.0.pow(attempt)',
+  '     251|     fun shouldGiveUp(attempt: Int) = attempt >= maxAttempts',
+  '',
+  '2. File: src/billing/Charge.kt',
+  '  Content:',
+  '      12|     val schedule = BackoffSchedule(maxAttempts = 5)',
+].join('\n')
+
+test('effects show under the search row and in the band, and survive a subagent turn', async ($, on) => {
+  mock.env(on, { HOME: '/home/dev' })
+  const clock = mock.clock(on, { now: NOW })
+  const store = new Map<string, unknown>()
+  on('store.get', async (_$, e) => ({ value: store.get(e.key) }))
+  on('store.set', async (_$, e) => (store.set(e.key, e.value), { value: undefined }))
+  on('fs.list', async () => ({ value: [] }))
+  on('fs.exists', async () => ({ value: false }))
+  on('ui.panes', async () => ({ value: [] }))
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('turn.start', async (_$, e) => ({ turnId: e.turnId }))
+  on('command.register', async (_$, e) => ({ value: { command: e.name } }))
+  on('ui.status', async () => ({ value: undefined }))
+  on('ui.render', async ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, 'engine') as RenderElement
+  })
+  on('process.run', async (_$, e) => {
+    if (e.argv[0] === 'git') {
+      if (e.argv.includes('--show-toplevel')) return ran('/repo\n')
+      if (e.argv.includes('--abbrev-ref')) return ran('main\n')
+      if (e.argv.includes('remote')) return ran('git@github.com:Acme/widgets.git\n')
+      return ran(`${HEAD}\n`)
+    }
+    return ran(STATUS)
+  })
+  let searchId = ''
+  on('tool.call', async (_$, e) => {
+    const call = e as unknown as Record<string, unknown>
+    if (e.tool === 'Bash') return { ref: 1, result: { stdout: '', stderr: '', interrupted: false }, text: 'Exit code 1', isError: true } as never
+    if (e.tool.startsWith('mcp__')) {
+      searchId = String(call.tool_use_id)
+      return { ref: 1, result: {}, text: SEARCH_OUTPUT } as never
+    }
+    if (e.tool === 'Read') {
+      return {
+        ref: 1,
+        result: { type: 'text', file: { filePath: call.file_path, content: '', numLines: 40, startLine: 240, totalLines: 900 } },
+        text: '...',
+      } as never
+    }
+    // Edit: the hunk sits at the line the search pointed at.
+    return {
+      ref: 1,
+      result: { filePath: call.file_path, oldString: '', newString: '', originalFile: null, structuredPatch: [{ oldStart: 12, oldLines: 1, newStart: 12, newLines: 1, lines: [] }], userModified: false, replaceAll: false },
+      text: 'ok',
+    } as never
+  })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+  await clock.settle()
+  await $.turn.start({ text: 'make retries back off', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'rg -n "RetryBackoff" src' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'grep -rn "backoff" src' } as never)
+  await $.tool.call({ tool: 'mcp__jbcontext__code_search', text: 'where retries back off between attempts' } as never)
+  await $.tool.call({ tool: 'Read', file_path: '/repo/src/billing/RetryPolicy.kt', offset: 240, limit: 40 } as never)
+  // A subagent's turn starts inside this one, and edits one of the files.
+  await $.turn.start({ text: 'edit it', turnId: 't2', agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: '/repo/src/billing/Charge.kt', old_string: 'x', new_string: 'y', agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: '/repo/src/billing/RetryPolicy.kt', old_string: 'x', new_string: 'y' } as never)
+  await clock.settle()
+
+  const row = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'ToolUse',
+    props: { tool_use_id: searchId, tool: 'mcp__jbcontext__code_search', input: { text: 'x' }, isRunning: false, isErrored: false, isInterrupted: false } as never,
+  })
+  expect(await row.find({ text: /found after 2 empty greps · exact lines · 2 files changed/ })).toBeDefined()
+  await row.unmount()
+
+  const band = async () =>
+    $.ui.mount({
+      plugin: 'jbcontext-watch',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: true, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 9 }, view: {} } as never,
+    })
+  let ui = await band()
+  // The subagent's turn start reset nothing: the band still counts the main turn's calls.
+  expect(await ui.find({ text: /this turn: 4 exploration calls · 1 via jbcontext/ })).toBeDefined()
+  expect(await ui.find({ text: /jbcontext delivered: 1 found after empty greps · 1 at the exact lines · 1 search → several files changed/ })).toBeDefined()
+  await ui.unmount()
+
+  const stored = store.get('effects:github.com/acme/widgets') as { days: Record<string, { afterEmpty: number; multiFile: number }> }
+  const today = Object.values(stored.days)[0]
+  expect(today?.afterEmpty).toBe(1)
+  expect(today?.multiFile).toBe(1)
+
+  // A new main turn clears the band's line; the badge under the search stays.
+  await $.turn.start({ text: 'next', turnId: 't3' } as never)
+  ui = await band()
+  expect(await ui.find({ text: /delivered/ })).toBeUndefined()
+  await ui.unmount()
+  const again = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'ToolUse',
+    props: { tool_use_id: searchId, tool: 'mcp__jbcontext__code_search', input: { text: 'x' }, isRunning: false, isErrored: false, isInterrupted: false } as never,
+  })
+  expect(await again.find({ text: /found after 2 empty greps/ })).toBeDefined()
+  await again.unmount()
+})

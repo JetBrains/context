@@ -1,7 +1,25 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { JbSearch, JbSession, JbTurn, JbView } from '../types'
+import type { EffectCounts, JbLedger, JbSearch, JbSession, JbTurn, JbView, SearchEffects } from '../types'
+import {
+  EMPTY_LEDGER,
+  ZERO_COUNTS,
+  addCounts,
+  addToDay,
+  classifyCall,
+  describeEffects,
+  describeTurnEffects,
+  diffBadges,
+  isZero,
+  localPathsInRepo,
+  parseLocalOutcome,
+  parseSearchOutput,
+  reduce,
+  shellRead,
+  toRepoPath,
+} from './effects'
+import type { CallRole, LedgerEvent, StoredEffects, UseDetail } from './effects'
 import {
   ago,
   claudeProjectDir,
@@ -17,6 +35,7 @@ import {
   formatUsd,
   indexLabel,
   indexNote,
+  isJbcontextSearch,
   isWholeLine,
   mergeDays,
   normalizeRepo,
@@ -28,6 +47,7 @@ import {
   savedTokens,
   scopeToRepo,
   searchLabel,
+  searchQuery,
   statusLine,
   tallyLines,
   touchesJbcontext,
@@ -49,6 +69,15 @@ const RESULT_SHOWN_MS = 4_000
 const view = atom({ plugin: 'jbcontext-watch', key: 'view' } as const, null as JbView | null)
 const turnState = atom({ plugin: 'jbcontext-watch', key: 'turn' } as const, null as JbTurn | null)
 const isBandHidden = atom({ plugin: 'jbcontext-watch', key: 'isBandHidden' } as const, false)
+// The effects' bookkeeping, never read while drawing so its writes redraw nothing; what
+// the transcript's search rows and the band draw from it lives in the two after it.
+const ledgerState = atom({ plugin: 'jbcontext-watch', key: 'ledger' } as const, null as JbLedger | null)
+const badgesState = atom({ plugin: 'jbcontext-watch', key: 'badges' } as const, null as Record<string, SearchEffects> | null)
+const countsState = atom(
+  { plugin: 'jbcontext-watch', key: 'effectCounts' } as const,
+  null as { session: EffectCounts; turn: EffectCounts } | null,
+)
+const EFFECTS_KEY = 'effects:'
 
 const EMPTY_TURN: JbTurn = {
   explorations: 0,
@@ -77,6 +106,12 @@ let appHome = ''
 let claudeHome = ''
 let tempHome = ''
 let cwd = ''
+let repoRoot = ''
+// The order calls start and finish in, so a read issued beside a search is not taken
+// for a use of its hits; carried on from the ledger after a reload.
+let seq = 0
+// Calls are recorded one after another, in the order they finished.
+let recording: Promise<void> = Promise.resolve()
 let isInteractive = false
 let statsStamp = ''
 // Every repository's searches and errors from the stats files, scoped to this one
@@ -186,11 +221,13 @@ async function refreshStatus($: EngineInterface) {
   isStatusRunning = true
   try {
     const git = (args: string[]) => $.process.run(['git', ...args], { cwd, timeoutMs: 5_000 })
-    const [head, branch, origin] = await Promise.all([
+    const [head, branch, origin, toplevel] = await Promise.all([
       git(['rev-parse', 'HEAD']),
       git(['rev-parse', '--abbrev-ref', 'HEAD']),
       git(['remote', 'get-url', 'origin']),
+      git(['rev-parse', '--show-toplevel']),
     ])
+    if (toplevel?.exitCode === 0 && toplevel.stdout.trim() !== '') repoRoot = toplevel.stdout.trim()
     if (head.exitCode !== 0) {
       await patch($, () => ({ index: { state: 'unavailable', reason: 'not a git repository' } }))
       return
@@ -495,6 +532,131 @@ async function finishSearch($: EngineInterface, startedAt: number, isError: bool
   $.clock.after(RESULT_SHOWN_MS + 100, () => $.ui.invalidate('ui.render'))
 }
 
+// ---------- effects ----------
+
+type CallOutcome = { deny?: string; result?: unknown; text?: string; isError?: boolean }
+
+function root(): string {
+  return repoRoot || cwd
+}
+
+function readDetail(e: Record<string, unknown>, result: unknown): { path: string; detail: UseDetail } | null {
+  if (e.tool === 'Bash') {
+    const read = shellRead(String(e.command ?? ''))
+    return read ? { path: read.path, detail: { kind: 'read', start: read.start, end: read.end, isPartial: read.isPartial } } : null
+  }
+  const path = typeof e.file_path === 'string' ? e.file_path : typeof e.notebook_path === 'string' ? e.notebook_path : null
+  if (path === null) return null
+  const file = (result as { file?: { startLine?: unknown; numLines?: unknown; totalLines?: unknown } } | undefined)?.file
+  if (file && typeof file.startLine === 'number' && typeof file.numLines === 'number') {
+    const total = typeof file.totalLines === 'number' ? file.totalLines : file.numLines
+    const start = file.startLine
+    return {
+      path,
+      detail: { kind: 'read', start, end: start + Math.max(file.numLines, 1) - 1, isPartial: start > 1 || file.numLines < total },
+    }
+  }
+  const offset = typeof e.offset === 'number' ? e.offset : null
+  const limit = typeof e.limit === 'number' ? e.limit : null
+  const start = offset ?? 1
+  return {
+    path,
+    detail: { kind: 'read', start, end: start + (limit ?? Number.MAX_SAFE_INTEGER - start) - 1, isPartial: offset !== null || limit !== null },
+  }
+}
+
+function editDetail(e: Record<string, unknown>, result: unknown): { path: string; detail: UseDetail } | null {
+  const path = typeof e.file_path === 'string' ? e.file_path : typeof e.notebook_path === 'string' ? e.notebook_path : null
+  if (path === null) return null
+  const record = (result ?? {}) as { structuredPatch?: unknown; originalFile?: unknown }
+  const olds = [
+    typeof e.old_string === 'string' ? e.old_string : null,
+    ...(Array.isArray(e.edits) ? e.edits.map(edit => (typeof edit?.old_string === 'string' ? edit.old_string : null)) : []),
+  ].filter((one): one is string => one !== null && one.length > 0)
+  let hunks = (Array.isArray(record.structuredPatch) ? record.structuredPatch : [])
+    .filter(hunk => typeof hunk?.oldStart === 'number')
+    .map(hunk => ({ start: hunk.oldStart, end: hunk.oldStart + Math.max(Number(hunk.oldLines) || 1, 1) - 1 }))
+  if (hunks.length === 0 && typeof record.originalFile === 'string') {
+    const original = record.originalFile
+    hunks = olds.flatMap(old => {
+      const at = original.indexOf(old)
+      if (at < 0) return []
+      const start = original.slice(0, at).split('\n').length
+      return [{ start, end: start + old.split('\n').length - 1 }]
+    })
+  }
+  return { path, detail: { kind: 'edit', hunks, oldLines: olds.flatMap(old => old.split('\n')) } }
+}
+
+// Turns a finished call into a ledger event, or null when it says nothing about the effects.
+function effectEvent(role: CallRole, e: Record<string, unknown>, outcome: CallOutcome, startSeq: number, doneSeq: number, repoKey: string | null): LedgerEvent | null {
+  if ('deny' in outcome && outcome.deny !== undefined) return null
+  const loop = typeof e.agentId === 'string' ? e.agentId : 'main'
+  const text = typeof outcome.text === 'string' ? outcome.text : ''
+  const tool = String(e.tool)
+  if (role === 'local') {
+    const local = parseLocalOutcome(tool, e, text, outcome.isError === true)
+    const command = typeof e.command === 'string' ? e.command : null
+    return { type: 'local', loop, seq: doneSeq, outcome: local.outcome, paths: localPathsInRepo(local.paths, command, root()), patterns: local.patterns }
+  }
+  if (outcome.isError === true) return null
+  if (role === 'search') {
+    const parsed = parseSearchOutput(text)
+    if (parsed === null || typeof e.tool_use_id !== 'string') return null
+    return { type: 'search', id: e.tool_use_id, loop, doneSeq, query: searchQuery(tool, e) ?? '', hits: parsed.hits, repoKey }
+  }
+  const use = role === 'read' ? readDetail(e, outcome.result) : editDetail(e, outcome.result)
+  if (use === null) return null
+  const path = toRepoPath(use.path, root())
+  return path === null ? null : { type: 'use', path, startSeq, doneSeq, detail: use.detail }
+}
+
+async function recordEffect($: EngineInterface, role: CallRole, e: Record<string, unknown>, outcome: CallOutcome, startSeq: number, doneSeq: number) {
+  try {
+    const current = await read($, view)
+    const repoKey = current?.repoKey ?? null
+    const event = effectEvent(role, e, outcome, startSeq, doneSeq, repoKey)
+    if (event === null) return
+    let changed: string[] = []
+    let searched = false
+    const ledger = await update($, ledgerState, value => {
+      const result = reduce(value ?? EMPTY_LEDGER, event)
+      changed = result.changed
+      searched = event.type === 'search'
+      return result.ledger
+    })
+    let delta: EffectCounts = { ...ZERO_COUNTS, searches: searched ? 1 : 0 }
+    if (changed.length > 0 && ledger) {
+      let found = ZERO_COUNTS
+      await update($, badgesState, value => {
+        const result = diffBadges(value ?? {}, ledger, changed)
+        found = result.delta
+        return result.badges
+      })
+      delta = addCounts(delta, found)
+    }
+    if (isZero(delta)) return
+    await update($, countsState, value => ({
+      session: addCounts(value?.session ?? ZERO_COUNTS, delta),
+      turn: addCounts(value?.turn ?? ZERO_COUNTS, delta),
+    }))
+    void bumpStore($, repoKey ?? root(), delta)
+  } catch {
+    // The effects are a view: a call they cannot read leaves them as they were.
+  }
+}
+
+async function bumpStore($: EngineInterface, repo: string, delta: EffectCounts) {
+  if (repo === '') return
+  try {
+    const key = `${EFFECTS_KEY}${repo}`
+    const stored = (await $.store.get(key)) as StoredEffects | undefined
+    await $.store.set(key, addToDay(stored, localDay(await $.clock.now()).key, delta))
+  } catch {
+    // Daily totals are best effort.
+  }
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -506,6 +668,7 @@ export const register: Register = on => {
     const claudeConfig = await $.env.get('CLAUDE_CONFIG_DIR')
     claudeHome = claudeConfig && claudeConfig.length > 0 ? claudeConfig : `${home}/.claude`
     tempHome = ((await $.env.get('TMPDIR')) || '/tmp').replace(/\/+$/, '')
+    seq = Math.max(seq, (await read($, ledgerState))?.seq ?? 0)
 
     await $.command.register({
       name: 'jbcontext',
@@ -547,7 +710,10 @@ export const register: Register = on => {
 
   // A subagent's turn runs inside the main one, whose counts go on through it.
   on('turn.start', async ($, e, next) => {
-    if (e.agentId === undefined) await update($, turnState, () => EMPTY_TURN)
+    if (e.agentId !== undefined) return next(e)
+    await update($, turnState, () => EMPTY_TURN)
+    await update($, ledgerState, value => reduce(value ?? EMPTY_LEDGER, { type: 'turn' }).ledger)
+    await update($, countsState, value => ({ session: value?.session ?? ZERO_COUNTS, turn: ZERO_COUNTS }))
     return next(e)
   })
 
@@ -557,20 +723,30 @@ export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
     const kind = explorationKind(e.tool, e)
     const touch = e.tool === 'Bash' ? touchesJbcontext(e.command) : kind === 'jbcontext' ? 'other' : null
-    if (kind === null && touch === null) return next(e)
+    const role = classifyCall(e.tool, e)
+    if (kind === null && touch === null && role === null) return next(e)
 
+    const startSeq = ++seq
     const startedAt = await $.clock.now()
     const label = kind === 'jbcontext' ? searchLabel(e.tool, e) : null
     if (label !== null) await patchTurn($, () => ({ searching: label }))
     if (touch === 'index') await patch($, () => ({ indexingSince: startedAt }))
     let isRefused = false
     let isError = true
+    let outcome: CallOutcome | undefined
     try {
       const result = await next(e)
+      outcome = result as CallOutcome
       isRefused = result.deny !== undefined
       isError = isRefused || result.isError === true
       return result
     } finally {
+      if (role !== null && outcome !== undefined && !isRefused) {
+        const doneSeq = ++seq
+        const call = e as unknown as Record<string, unknown>
+        const done = outcome
+        recording = recording.then(() => recordEffect($, role, call, done, startSeq, doneSeq))
+      }
       if (kind !== null && !isRefused) {
         await patchTurn($, turn => ({
           explorations: turn.explorations + 1,
@@ -617,8 +793,9 @@ export const register: Register = on => {
   // started before the end, while the session's id may still be the old one's, writes.
   on('session.end', async ($, e, next) => {
     const isReplaced = e.reason === 'clear' || e.reason === 'resume'
-    const forget = () => {
+    const forget = async () => {
       patchedSeq = measureSeq
+      await update($, countsState, () => ({ session: ZERO_COUNTS, turn: ZERO_COUNTS }))
       return patch($, () => ({ session: null }))
     }
     if (isReplaced) await forget()
@@ -645,7 +822,8 @@ export const register: Register = on => {
       !isIndexing &&
       (current.index?.state === 'none' ||
         (current.index?.state === 'unavailable' && current.index.reason !== 'not a git repository'))
-    if (!isIndexing && !isTurnShown && !isIndexShown && !isFreshError) return next(e)
+    const effectsLine = describeTurnEffects((await read($, countsState))?.turn ?? ZERO_COUNTS)
+    if (!isIndexing && !isTurnShown && !isIndexShown && !isFreshError && effectsLine === null) return next(e)
 
     const { Box, Text } = $.ui.resolve(e)
     const index = describeIndex(current.index, now)
@@ -664,6 +842,11 @@ export const register: Register = on => {
             ''
           )}
         </Text>
+        {effectsLine !== null && (
+          <Text color="success" wrap="truncate-end">
+            {effectsLine}
+          </Text>
+        )}
         {isIndexShown && (
           <Text color={index.color} wrap="truncate-end">
             {indexText}
@@ -675,6 +858,26 @@ export const register: Register = on => {
             {error.message}
           </Text>
         )}
+      </Box>
+    )
+  })
+
+  // Under a jbcontext search's row in the transcript: what it achieved so far.
+  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+    // Other rows read nothing, so the badges' writes redraw only search rows.
+    if (!isJbcontextSearch(e.props.tool, e.props.input)) return next(e)
+    const effects = (await read($, badgesState))?.[e.props.tool_use_id]
+    const text = effects ? describeEffects(effects) : null
+    const row = await next(e)
+    if (text === null) return row
+    const { Box, Text } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="column">
+        {row}
+        <Text color="success" wrap="truncate-end">
+          {'  '}
+          {text}
+        </Text>
       </Box>
     )
   })

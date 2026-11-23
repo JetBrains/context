@@ -84,8 +84,89 @@ export type JbView = {
   updatedAt: number
 }
 
+// A hit's lines as the search printed them; `end` is a lower bound when the snippet
+// was cut (`isTruncated`).
+export type HitRange = { start: number; end: number; isTruncated: boolean }
+
+// What the agent did with a hit's file after the search.
+export type HitUse = { read: boolean; edited: boolean; exact: boolean }
+
+// One file of a search's hits, the hits in it merged.
+export type HitFile = {
+  // Repository-relative, as the search printed it.
+  path: string
+  // The repository label of a multi-repo hit that is not this repository; null for this one.
+  repo: string | null
+  // Empty for a hit listed by name alone.
+  ranges: HitRange[]
+  // The snippet's lines, trimmed, those of 8 characters or more.
+  snippet: string[]
+  // Named by a local search's output, read or edited earlier this turn.
+  isKnown: boolean
+  // No earlier jbcontext search this turn listed it.
+  isFirstFinder: boolean
+  use: HitUse | null
+}
+
+// Local searches (grep, rg, find...) a loop ran since its last jbcontext search.
+export type LoopWindow = { empty: number; nonEmpty: number; patterns: string[] }
+
+export type SearchRecord = {
+  // The search call's tool_use_id: the transcript row its badge goes under.
+  id: string
+  turn: number
+  // The subagent's id, or 'main'.
+  loop: string
+  // When it finished, in the ledger's call order.
+  doneSeq: number
+  query: string
+  files: HitFile[]
+  window: LoopWindow
+}
+
+// Every jbcontext search of the current and the previous main turn, and what the turn's
+// local searches, reads and edits have shown so far.
+export type JbLedger = {
+  turn: number
+  seq: number
+  seen: string[]
+  windows: Record<string, LoopWindow>
+  searches: SearchRecord[]
+}
+
+// What one search achieved; each field only grows.
+export type SearchEffects = {
+  // Empty local searches before it, when it found a used file they could not; 0 otherwise.
+  afterEmpty: number
+  // Local searches before it that returned results but not the used file it found; 0 otherwise.
+  missedBy: number
+  byMeaning: boolean
+  exactLines: boolean
+  // Distinct files of its hits edited since.
+  filesChanged: number
+  usedFiles: number
+}
+
+export type EffectCounts = {
+  searches: number
+  used: number
+  afterEmpty: number
+  missedByGrep: number
+  byMeaning: number
+  exactLines: number
+  multiFile: number
+  filesChanged: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
-    'jbcontext-watch': { view: JbView | null; turn: JbTurn | null; isBandHidden: boolean }
+    'jbcontext-watch': {
+      view: JbView | null
+      turn: JbTurn | null
+      isBandHidden: boolean
+      ledger: JbLedger | null
+      badges: Record<string, SearchEffects> | null
+      effectCounts: { session: EffectCounts; turn: EffectCounts } | null
+    }
   }
 }
