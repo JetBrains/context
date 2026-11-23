@@ -1,81 +1,61 @@
 # Tools
 
-## Code discovery: context-explorer first
+## Code discovery: semantic search first
 
-When a task requires finding or understanding code whose location you don't
-already know, your FIRST code-discovery step MUST be:
+When you need to locate unfamiliar code, your first code-discovery action MUST be `jbcontext search`. Use it directly rather than launching a context-explorer subagent or opening with repository-wide grep, glob, directory listings, or git history. The goal is to replace manual exploration with a small set of useful file pointers, not add a research phase.
 
-Task(subagent_type='context-explorer',
-     description=<short label>,
-     prompt=<1-2 sentence intent describing what to find>)
+Skip semantic search when no code location needs discovering:
+- The relevant file or implementation is already identified or open.
+- An exact file, class, or symbol is given and a direct open or exact lookup is sufficient.
+- The task is a git operation, test/build execution, shell/config setup, or review of an available diff.
 
-Start there instead of opening with your own `grep`/`glob`/`bash` searches or
-git history: the subagent runs the semantic exploration in its own context and
-hands back concrete `file:line` references, so you don't burn your context
-re-reading the same files.
-
-This governs *how* you begin code discovery - not whether every task needs it.
-Do NOT call context-explorer when the task doesn't involve locating code:
-
-- the task names the exact file, class, or symbol - open it or grep directly;
-- the relevant file is already open or identified;
-- the work is a git operation (rebase, merge, commit), a test/build run,
-  shell/statusline/config setup, or a review of a diff you already have.
-
-Invoking context-explorer as a formality "to get started" on such tasks wastes
-a subagent round and returns irrelevant findings. It is a research step, not a
-gate to clear - skip it and proceed directly.
-
-When you do use it, the subagent runs up to 3 semantic searches in its own
-context (restricted to `jbcontext search` via `Bash` and `Read` only) and
-returns a short report:
-
-Searched: <one-line summary>
-Findings:
-- <relative/path>:<line> - <description>
-- ...
-Notes: <confidence; whether keyword grep would be more direct here>
-
-Use its findings if they look useful, or ignore them entirely if `Notes:` flags
-the task as keyword-based. You retain full freedom for the rest of the run.
+A feature name, endpoint, UI label, or behavior is a query anchor, not proof that its implementation is already known.
 
 ## Semantic Code Search (jbcontext)
 
-You have access to `jbcontext search` for searching the codebase semantically.
-It finds code by meaning, not just keywords.
+Search by meaning when the implementation's location is unknown.
 
 ### Usage
 
 ```bash
-jbcontext search "<detailed and descriptive query>"
-jbcontext search -p <path> "<query>"  # <path> must be relative to the project root
+jbcontext search "<query>"
+jbcontext search -p <path> "<query>"
 ```
 
-### Query Tips
-
-- Be descriptive: "function that validates user email addresses" > "email"
-- Include context: "error handling middleware for HTTP requests with logging"
-- Specify what you're looking for: "React component that renders a modal dialog"
-
-### Single-Shot Policy
-
-Use `jbcontext search` as a semantic bootstrap when the relevant file or subsystem is still unknown.
-
-- If no relevant file is open yet, start with one `jbcontext search`.
-- Make the first query specific to the issue's named feature, class, method, config flag, or behavior when available.
-- After the first search, open at least one returned file and inspect it locally.
-- If the first hit is relevant but incomplete, inspect neighboring files locally in that same directory or subsystem before any semantic retry.
-- After the first relevant file or path is known, prefer direct file reads and exact search to inspect nearby code.
-- If a semantic retry is still needed, use `jbcontext search -p <path> ...` with the directory of the best first hit.
-
-### Examples
+`<path>` must be relative to the project root. The optional flag `--limit <n>` caps the number of returned files; the default is 50. Start with `--limit 5` to avoid carrying large result lists through the rest of the task:
 
 ```bash
-# Find authentication-related code
-jbcontext search "user authentication login flow"
-
-# Narrow to specific directory
-jbcontext search -p src/auth "JWT token validation"
+jbcontext search --limit 5 "<query>"
+jbcontext search -p <path> --limit 5 "<query>"
 ```
 
-Use `jbcontext search` once to get the initial pointer, then inspect nearby code locally. If that still fails, do a narrowed retry with `-p`.
+### Target the implementation
+
+Make one focused query containing:
+- The task's distinctive feature, endpoint, field, error, or behavior.
+- The operation to locate: creation/defaulting, permission checks, query-field registration, persistence/restore, or another relevant responsibility.
+- The owning product, runtime, or layer when the task distinguishes it.
+
+Retain the task's exact names alongside a short behavioral description. Avoid generic queries such as "query parsing implementation" when a specific feature is named. Do not invent likely class names or turn a multi-part task into several speculative searches.
+
+If the task contrasts two implementations, identify which needs changing and which is only a reference. Similar names in another product, compatibility layer, CLI, generated schema, or documentation do not establish ownership.
+
+### Read, follow, stop
+
+After the first search, read the most promising returned implementation file before any further semantic search. Inspect only the relevant range, including enough surrounding code to understand it.
+
+Use the results as a ranked shortlist, not a reading list. Verify that the candidate handles the requested entry point and behavior. Once it does:
+- Follow concrete imports, calls, registrations, or delegations with direct reads or scoped exact searches.
+- Use discovered symbols and paths instead of repeatedly searching for the same concept.
+- Trace only the links needed to establish ownership and behavior. Prefer a shared policy or normalization layer over independently exploring every backend.
+- Do not reread unchanged files or explore every neighboring file.
+
+### Retry only for a specific gap
+
+One search is normally enough. Before retrying, identify what remains unknown and why local inspection cannot answer it.
+
+For a relevant but incomplete hit, inspect its concrete references first. If semantic search is still needed, narrow with `-p` to the smallest verified owning directory and query the missing responsibility, not a paraphrase of the first query.
+
+If the first results belong to the wrong subsystem, correct the product/runtime/layer in the query; do not narrow into the wrong directory. If five results provide no useful pointer, refine the query or modestly increase the limit rather than dumping the default 50 results.
+
+Stop semantic discovery when the implementation and necessary relationships are identified. Search is a locator, not evidence that the first plausible file is the right place.
