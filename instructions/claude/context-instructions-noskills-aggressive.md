@@ -25,7 +25,8 @@ repo and don't know where to look.
 
 Skip it - go straight to the right tool - when:
 
-- the task names the exact file, class, or symbol (keyword grep is faster);
+- the task names the exact file, class, or symbol (keyword grep is faster; for a symbol's uses or implementations,
+  use the structural commands below);
 - the relevant file is already open or identified;
 - the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds,
   shell/statusline/config setup, or reviewing a diff you already have.
@@ -44,8 +45,8 @@ not whether every task needs a search.
 - Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
 - Inspect the first relevant file or directory before issuing another broad semantic search.
 - Use another broad `jbcontext search` only if the local path stops being productive.
-- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
-  inspection.
+- Once you know the relevant file, symbol, or directory, switch to direct file reads, exact search, or the
+  structural commands below for local inspection.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
 
 ### Examples
@@ -62,3 +63,19 @@ jbcontext search -p test "tests checking that unauthenticated requests are rejec
 # Find documentation or specs
 jbcontext search "design doc describing how the authentication flow handles token refresh"
 ```
+
+## Structural Code Navigation (jbcontext)
+
+For a declaration whose name you already know, `jbcontext` finds the declaration itself and labels each use
+(call, read, write, import) instead of listing every line that contains the text:
+
+- Who uses it: `jbcontext references Service.run` or `jbcontext references --at src/Service.kt:12`.
+- What implements or extends it: `jbcontext implementations Service`.
+- Where it is declared and what its body is: `jbcontext symbol Service.run --source-lines`.
+
+### MANDATORY: structural check before editing
+
+Before you edit a function, method, class, interface or field declared in the repository, run
+`jbcontext references <Name>` for it; when subclasses can override it, also run `jbcontext implementations <Name>`.
+Update every use that your change affects. If a command fails, or finds nothing for a name you know exists,
+fall back to grep or rg.
