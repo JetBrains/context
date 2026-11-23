@@ -217,7 +217,8 @@ export function parseLocalOutcome(tool: string, args: unknown, text: string, isE
   const code = exit ? Number(exit[1]) : isError ? 1 : 0
   const body = text
     .replace(/^\s*Exit code \d+\s*$/m, '')
-    .replace(/^\s*\((?:no output|no content)\)\s*$/im, '')
+    // The placeholder the model reads for a command that printed nothing.
+    .replace(/^\s*\([^()\n]*\bno (?:output|content)\)\s*$/im, '')
     .trim()
 
   if (code >= 2 || (FAILURE.test(body) && !/^\S+:\d+:/m.test(body))) return { outcome: 'failed', paths: [], patterns }

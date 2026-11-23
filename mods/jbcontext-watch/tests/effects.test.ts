@@ -106,6 +106,7 @@ test('local searches: empty, found with paths, failed', () => {
   const rg = { command: 'rg -n "retry policy" src' }
   expect(parseLocalOutcome('Bash', rg, 'Exit code 1', true).outcome).toBe('empty')
   expect(parseLocalOutcome('Bash', rg, '', false).outcome).toBe('empty')
+  expect(parseLocalOutcome('Bash', rg, '(Bash completed with no output)', false).outcome).toBe('empty')
   expect(parseLocalOutcome('Bash', rg, 'Exit code 2\nrg: regex parse error', true).outcome).toBe('failed')
   expect(parseLocalOutcome('Bash', { command: 'grep -rn retry src | wc -l' }, '0', false).outcome).toBe('empty')
   expect(parseLocalOutcome('Bash', rg, 'src/a.kt:12:retry\nsrc/a.kt:20:retry\nsrc/b.kt:3:retry', false)).toEqual({

@@ -595,7 +595,11 @@ function effectEvent(role: CallRole, e: Record<string, unknown>, outcome: CallOu
   const text = typeof outcome.text === 'string' ? outcome.text : ''
   const tool = String(e.tool)
   if (role === 'local') {
-    const local = parseLocalOutcome(tool, e, text, outcome.isError === true)
+    // A shell search's own output, not the text the model reads, which stands a
+    // placeholder in for none.
+    const stdout = (outcome.result as { stdout?: unknown } | undefined)?.stdout
+    const output = tool === 'Bash' && outcome.isError !== true && typeof stdout === 'string' ? stdout : text
+    const local = parseLocalOutcome(tool, e, output, outcome.isError === true)
     const command = typeof e.command === 'string' ? e.command : null
     return { type: 'local', loop, seq: doneSeq, outcome: local.outcome, paths: localPathsInRepo(local.paths, command, root()), patterns: local.patterns }
   }
