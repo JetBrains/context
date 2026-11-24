@@ -47,6 +47,8 @@ not whether every task needs a search.
 - Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
   inspection.
 - If you search again after finding a relevant area, narrow with `-p <path>`.
+- Size of `jbcontext search` result bundle is bounded to at most 5 short code snippets up to 750 chars each, followed by compact one-line `File:` paths, capped at 50 results total and safe to read in full.
+
 
 ### Examples
 
