@@ -1,1 +1,1 @@
-- Find uses of a declaration: `{{JBCONTEXT}} references Service.run` or `{{JBCONTEXT}} references --at src/Service.kt:12`. Use `--resolved` for uses tied by a type or import.
+| Uses of a declaration | `{{JBCONTEXT}} references NAME` |

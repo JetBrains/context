@@ -1,1 +1,1 @@
-- Find implementations and subtypes: `{{JBCONTEXT}} implementations Service --depth 2`.
+| Implementations or subtypes | `{{JBCONTEXT}} implementations TYPE` |

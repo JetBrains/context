@@ -1,1 +1,1 @@
-- Inspect a file syntax tree or parse errors: `{{JBCONTEXT}} parse src/Service.kt --errors`.
+| Syntax or parse errors | `{{JBCONTEXT}} parse FILE --errors` |

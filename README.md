@@ -53,3 +53,23 @@ Example experiment flags:
 --auto --accio-disable-tools trace,impact,tests
 --auto --no-accio
 ```
+
+### Compact selectors and command help
+
+`accio/tools/<command>.md` contains one routing-table row with a basic invocation. Instructions,
+the search skill, and explorer definitions render only enabled rows, in CLI command order. Reminders
+contain routing intent and enabled names. Air Context semantic search remains available independently.
+These entry points deliberately omit expanded command manuals, including when skills or explorers
+are installed alongside inline instructions.
+
+`accio/help/<command>.md` holds detailed examples, wrapper restrictions, and result interpretation.
+The CLI displays this guidance before native Accio options for exactly `jbcontext <command> --help`
+or `jbcontext <command> -h`. Other argument combinations are forwarded unchanged, so option-like
+query values such as `locate -e --help` remain queries. Ordinary searches never request help automatically.
+Help uses the existing bundled/cache source policy and works offline without indexing or Air authentication.
+
+Build the CLI with this prompt checkout, then use the existing `setup-agent` or `refresh-agents`
+mechanism to regenerate installed instructions, skills, explorers, and reminders. For a remote prompt
+source, publish this repository and use the existing `--prompts-location` option. Help resources are
+cached with the other prompts; no new setting or migration is needed. Older renderers can continue
+reading the compact `accio/tools/` fragments.

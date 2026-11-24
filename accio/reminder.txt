@@ -1,1 +1,1 @@
-Use {{JBCONTEXT}} search for behavior or meaning. Use the matching enabled local {{JBCONTEXT}} command for exact or structural questions. Enabled local tools: {{ACCIO_TOOL_NAMES}}. Read/edit known locations directly; use external search if the required capability is disabled, unsupported, or unavailable.
+Use {{JBCONTEXT}} search (Air Context) for meaning; choose an enabled local command for exact or structural questions. Enabled: {{ACCIO_TOOL_NAMES}}. Read known files directly; use the existing fallback for unavailable capabilities.
