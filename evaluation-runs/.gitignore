@@ -1,0 +1,4 @@
+# Private SWE-bench LG evaluation artifacts — never commit to public repo
+*
+!.gitignore
+!*.md

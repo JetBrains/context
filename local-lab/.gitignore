@@ -1,0 +1,11 @@
+# Private benchmark tasks, checkouts, indices, and trial traces — never commit to public repo
+tasks/
+repos/
+indexes/
+workspaces/
+trials/
+grades/
+runtime/
+report_*.json
+__pycache__/
+.venv/
