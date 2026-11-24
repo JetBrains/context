@@ -32,7 +32,11 @@ Use `--scope <path-or-glob>` to narrow Accio searches, `--project <checkout>` fo
 and `--ref <revision>` for committed code. Air Context uses its own `-p` / `--path-filter` option.
 Accio normally searches the working tree and refreshes edited and nonignored untracked files automatically.
 Use `--format json` where supported for structured output and `<command> --help` for the pinned command's options.
-Read the reported availability, quality, completeness, and truncation notes; an incomplete answer is not proof of absence.
+Read availability, quality, completeness, truncation, and coverage notes. Project coverage can be partial while
+libraries are building or not loaded; a complete result list does not imply full index coverage. Out-of-scope or
+corrected-scope suggestions appear separately as alternatives and are not matches in the requested scope.
+Multiple targets have independent numbered text answers. JSON shapes follow the command: name commands and files
+return arrays; locate returns one object for one query and an array for several. Plain output stays header-free.
 
 Read and edit known locations using native file tools. Builds, tests, Git operations, and filtering command output
 continue normally. Use external search when the needed capability is disabled, unsupported, or reports an error;

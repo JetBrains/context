@@ -1,0 +1,1 @@
+- Inspect a marked working-tree diff: `{{JBCONTEXT}} diff`; compare from another base with `--base main`, or two revisions with `--base main --ref feature`. Use `--loud` for lines that need review, `--format json` for structured output, and `-- src/Service.kt` to restrict paths. Marks are review guidance, not a proof of compatibility.

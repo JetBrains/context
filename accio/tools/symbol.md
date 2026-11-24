@@ -1,1 +1,1 @@
-- Find declarations and source bodies: `{{JBCONTEXT}} symbol Service.run --source-lines`. Use `--at path:line` to identify a known declaration precisely.
+- Find declarations and bounded source bodies: `{{JBCONTEXT}} symbol Service.run --source-lines` prints a function's first 30 lines or a type outline; `--source-lines all` requests the whole body and `--source-lines N` sets a line limit. Use `--at path:line[:column]` for a known position or `--pattern AgentConsTest --kind class` for an IDE-style name pattern. Multiple names or positions produce independent answers.
