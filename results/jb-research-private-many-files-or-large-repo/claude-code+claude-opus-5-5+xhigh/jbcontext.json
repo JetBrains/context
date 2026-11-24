@@ -1,0 +1,31 @@
+{
+  "$comment": [
+    "Cell claude-code+claude-opus-5-5+xhigh of BenchRoom (many files, large repos), exported from the Agentic Benchmark page on the run pair below.",
+    "jbcontext 0.9.21.1593 on the release channel, claude-code 2.1.325, flags --auto.",
+    "Warning: baseline covers 395 tasks, this run 396",
+    "The arm run WITH jbcontext: TeamCity build #121.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
+    "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
+    "toolCalls: mean tool calls per task, from the junie_number_tool_calls_avg build statistic",
+    "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
+  ],
+  "schema": "jbcontext-eval-arm/1",
+  "arm": "jbcontext",
+  "dataset": "jb-research-private-many-files-or-large-repo",
+  "harness": "claude-code",
+  "model": "claude-opus-5-5",
+  "effort": "xhigh",
+  "integration": "--auto",
+  "taskCount": 396,
+  "resolvedRate": 0.5303,
+  "run": {
+    "pipeline": "https://matterhorn.internal.teamcity.cloud/buildConfiguration/Matterhorn_BenchmarksV1_AggregateExecutionsJbResearchPrivateSweBenchAllValidIdsAllIterationsManyFilesOrLargeRepoWithSeedsEmbark/7646582",
+    "startedAt": "20261116T170112+0000"
+  },
+  "metrics": {
+    "costUsd": 3.2723,
+    "turns": 69.43,
+    "toolCalls": 406.96,
+    "latencyMs": 778851.0
+  }
+}
