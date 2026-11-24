@@ -16,7 +16,7 @@ Use this skill to install the jbcontext CLI and finish first-time setup (login, 
 ## Do not use for
 
 - Authentication issues -> use `jbcontext login`
-- Missing project index -> use `jbcontext index`
+- Missing project index -> use `jbcontext index --if-needed`
 - Agent integration only -> use `jbcontext setup-agent --help`
 
 ## Install
@@ -54,8 +54,12 @@ jbcontext login
 There is no index on the server.
 
 ```bash
-jbcontext index
+jbcontext index --if-needed
 ```
+
+`--if-needed` builds a remote index only when no existing one already covers this checkout. On a branch that isn't
+indexed remotely, it indexes the commit where the branch left the default one; your own changes are still searchable
+through the local overlay.
 
 ### Agent setup
 
