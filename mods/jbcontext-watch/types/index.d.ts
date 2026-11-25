@@ -106,10 +106,54 @@ export type HitFile = {
   // No earlier jbcontext search this turn listed it.
   isFirstFinder: boolean
   use: HitUse | null
+  // The place of its first hit in the search's results, from 1.
+  rank?: number
+}
+
+// One local search as the trail shows it: what was run, and what it gave.
+export type TrailLocal = {
+  // Its tool_use_id, the transcript row it was; null when the call carried none.
+  id: string | null
+  // The command, or `Grep <pattern> <path>` for a tool.
+  label: string
+  outcome: 'empty' | 'found'
+  // Files its output named, and the first few of them.
+  files: number
+  sample: string[]
+}
+
+// One read or edit of a search's hit file, as the trail shows it.
+export type TrailUse = {
+  id: string | null
+  kind: 'read' | 'edit'
+  // `Read`, `Edit`, `cat`, `sed`...
+  tool: string
+  path: string
+  // The lines read or changed; null for a whole-file read.
+  lines: { start: number; end: number } | null
+  // The search's hit it fell on: its place in the results, and its lines (null for
+  // a hit listed by name alone).
+  rank: number
+  hit: { start: number; end: number } | null
+  exact: boolean
+}
+
+// How a search delivered, kept for its row after the ledger has let it go.
+export type SearchTrail = {
+  turn: number
+  query: string
+  hitCount: number
+  fileCount: number
+  before: TrailLocal[]
+  uses: TrailUse[]
+  // A used file it found that the local searches before it had not named.
+  target: string | null
+  // The used files it found that share no word with the query.
+  meaning: string[]
 }
 
 // Local searches (grep, rg, find...) a loop ran since its last jbcontext search.
-export type LoopWindow = { empty: number; nonEmpty: number; patterns: string[] }
+export type LoopWindow = { empty: number; nonEmpty: number; patterns: string[]; steps?: TrailLocal[] }
 
 export type SearchRecord = {
   // The search call's tool_use_id: the transcript row its badge goes under.
@@ -122,6 +166,9 @@ export type SearchRecord = {
   query: string
   files: HitFile[]
   window: LoopWindow
+  hitCount?: number
+  // Reads and edits of its files since, oldest first.
+  uses?: TrailUse[]
 }
 
 // Every jbcontext search of the current and the previous main turn, and what the turn's
@@ -167,6 +214,10 @@ declare module 'claude-code' {
       ledger: JbLedger | null
       badges: Record<string, SearchEffects> | null
       effectCounts: { session: EffectCounts; turn: EffectCounts } | null
+      // tool_use_id → how that search delivered.
+      trails: Record<string, SearchTrail> | null
+      // This turn's searches with something on their badge, in the order they first got it.
+      deliveries: string[] | null
     }
   }
 }

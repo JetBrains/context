@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { EffectCounts, JbLedger, JbSearch, JbSession, JbTurn, JbView, SearchEffects } from '../types'
+import type { EffectCounts, JbLedger, JbSearch, JbSession, JbTurn, JbView, SearchEffects, SearchTrail } from '../types'
 import {
   EMPTY_LEDGER,
   ZERO_COUNTS,
@@ -9,6 +9,7 @@ import {
   addToDay,
   classifyCall,
   describeEffects,
+  describeTrail,
   describeTurnEffects,
   diffBadges,
   isZero,
@@ -18,6 +19,7 @@ import {
   reduce,
   shellRead,
   toRepoPath,
+  trailOf,
 } from './effects'
 import type { CallRole, LedgerEvent, StoredEffects, UseDetail } from './effects'
 import {
@@ -77,7 +79,14 @@ const countsState = atom(
   { plugin: 'jbcontext-watch', key: 'effectCounts' } as const,
   null as { session: EffectCounts; turn: EffectCounts } | null,
 )
+// How each search delivered, for its row's expanded view, and this turn's delivering
+// searches in order, for the band's list; the band stays until the next prompt.
+const trailsState = atom({ plugin: 'jbcontext-watch', key: 'trails' } as const, null as Record<string, SearchTrail> | null)
+const deliveriesState = atom({ plugin: 'jbcontext-watch', key: 'deliveries' } as const, null as string[] | null)
 const EFFECTS_KEY = 'effects:'
+const MAX_TRAILS = 200
+// Rows of the band's list, each pressed by its digit.
+const MAX_DELIVERIES_SHOWN = 5
 
 const EMPTY_TURN: JbTurn = {
   explorations: 0,
@@ -588,6 +597,13 @@ function editDetail(e: Record<string, unknown>, result: unknown): { path: string
   return { path, detail: { kind: 'edit', hunks, oldLines: olds.flatMap(old => old.split('\n')) } }
 }
 
+// A local search as the trail names it: the shell command, or the tool and its pattern.
+function localLabel(tool: string, e: Record<string, unknown>): string {
+  if (typeof e.command === 'string') return e.command
+  const parts = [tool, e.pattern, e.path].filter((one): one is string => typeof one === 'string' && one.length > 0)
+  return parts.join(' ')
+}
+
 // Turns a finished call into a ledger event, or null when it says nothing about the effects.
 function effectEvent(role: CallRole, e: Record<string, unknown>, outcome: CallOutcome, startSeq: number, doneSeq: number, repoKey: string | null): LedgerEvent | null {
   if ('deny' in outcome && outcome.deny !== undefined) return null
@@ -601,7 +617,16 @@ function effectEvent(role: CallRole, e: Record<string, unknown>, outcome: CallOu
     const output = tool === 'Bash' && outcome.isError !== true && typeof stdout === 'string' ? stdout : text
     const local = parseLocalOutcome(tool, e, output, outcome.isError === true)
     const command = typeof e.command === 'string' ? e.command : null
-    return { type: 'local', loop, seq: doneSeq, outcome: local.outcome, paths: localPathsInRepo(local.paths, command, root()), patterns: local.patterns }
+    return {
+      type: 'local',
+      loop,
+      seq: doneSeq,
+      outcome: local.outcome,
+      paths: localPathsInRepo(local.paths, command, root()),
+      patterns: local.patterns,
+      id: typeof e.tool_use_id === 'string' ? e.tool_use_id : null,
+      label: localLabel(tool, e),
+    }
   }
   if (outcome.isError === true) return null
   if (role === 'search') {
@@ -612,7 +637,9 @@ function effectEvent(role: CallRole, e: Record<string, unknown>, outcome: CallOu
   const use = role === 'read' ? readDetail(e, outcome.result) : editDetail(e, outcome.result)
   if (use === null) return null
   const path = toRepoPath(use.path, root())
-  return path === null ? null : { type: 'use', path, startSeq, doneSeq, detail: use.detail }
+  if (path === null) return null
+  const tool_ = tool === 'Bash' ? (String(e.command ?? '').trim().split(/\s+/)[0] ?? 'Bash') : tool
+  return { type: 'use', path, startSeq, doneSeq, detail: use.detail, id: typeof e.tool_use_id === 'string' ? e.tool_use_id : null, tool: tool_ }
 }
 
 async function recordEffect($: EngineInterface, role: CallRole, e: Record<string, unknown>, outcome: CallOutcome, startSeq: number, doneSeq: number) {
@@ -632,12 +659,13 @@ async function recordEffect($: EngineInterface, role: CallRole, e: Record<string
     let delta: EffectCounts = { ...ZERO_COUNTS, searches: searched ? 1 : 0 }
     if (changed.length > 0 && ledger) {
       let found = ZERO_COUNTS
-      await update($, badgesState, value => {
+      const badges = await update($, badgesState, value => {
         const result = diffBadges(value ?? {}, ledger, changed)
         found = result.delta
         return result.badges
       })
       delta = addCounts(delta, found)
+      await recordTrails($, ledger, badges ?? {}, changed)
     }
     if (isZero(delta)) return
     await update($, countsState, value => ({
@@ -647,6 +675,49 @@ async function recordEffect($: EngineInterface, role: CallRole, e: Record<string
     void bumpStore($, repoKey ?? root(), delta)
   } catch {
     // The effects are a view: a call they cannot read leaves them as they were.
+  }
+}
+
+// The changed searches' trails, and this turn's ones that delivered something added to
+// the band's list.
+async function recordTrails($: EngineInterface, ledger: JbLedger, badges: Record<string, SearchEffects>, changed: string[]) {
+  const searches = ledger.searches.filter(one => changed.includes(one.id))
+  if (searches.length === 0) return
+  await update($, trailsState, value => {
+    const next = { ...(value ?? {}) }
+    for (const search of searches) {
+      delete next[search.id]
+      next[search.id] = trailOf(search)
+    }
+    const ids = Object.keys(next)
+    for (const id of ids.slice(0, Math.max(0, ids.length - MAX_TRAILS))) delete next[id]
+    return next
+  })
+  const delivering = searches
+    .filter(one => one.turn === ledger.turn && badges[one.id] && describeEffects(badges[one.id]!) !== null)
+    .map(one => one.id)
+  if (delivering.length === 0) return
+  await update($, deliveriesState, value => {
+    const list = value ?? []
+    const fresh = delivering.filter(id => !list.includes(id))
+    return fresh.length === 0 ? list : [...list, ...fresh]
+  })
+}
+
+const TRAIL_COLOR = { miss: 'error', near: 'warning', search: 'claude', use: 'success', meaning: 'suggestion' } as const
+
+function clipQuery(query: string): string {
+  return query.length > 48 ? `${query.slice(0, 47)}…` : query
+}
+
+// Brings a search's row into view: a press is the person's own input, the only time a
+// transcript row may be scrolled to.
+async function jumpTo($: EngineInterface, id: string) {
+  try {
+    const moved = await $.ui.scroll({ to: { requestId: id }, block: 'center' })
+    if ('deny' in moved && moved.deny) $.ui.toast(`Couldn't scroll to that search (${moved.deny}); ctrl+o lists it with how it delivered.`)
+  } catch {
+    $.ui.toast("Couldn't scroll to that search; ctrl+o lists it with how it delivered.")
   }
 }
 
@@ -718,6 +789,7 @@ export const register: Register = on => {
     await update($, turnState, () => EMPTY_TURN)
     await update($, ledgerState, value => reduce(value ?? EMPTY_LEDGER, { type: 'turn' }).ledger)
     await update($, countsState, value => ({ session: value?.session ?? ZERO_COUNTS, turn: ZERO_COUNTS }))
+    await update($, deliveriesState, () => [])
     return next(e)
   })
 
@@ -800,6 +872,7 @@ export const register: Register = on => {
     const forget = async () => {
       patchedSeq = measureSeq
       await update($, countsState, () => ({ session: ZERO_COUNTS, turn: ZERO_COUNTS }))
+      await update($, deliveriesState, () => [])
       return patch($, () => ({ session: null }))
     }
     if (isReplaced) await forget()
@@ -809,9 +882,13 @@ export const register: Register = on => {
   })
 
   // While Claude works: the turn's exploration once it called jbcontext, an index search
-  // cannot use, and a fresh error. Nothing when there is nothing of these to say.
+  // cannot use, and a fresh error; and what the turn's searches delivered, each a row
+  // that jumps to its search, which stays once the turn ended, until the next prompt.
+  // Nothing when there is nothing of these to say.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || !e.props.isWorking || (await read($, isBandHidden))) return next(e)
+    if (e.props.hasSurvey || (await read($, isBandHidden))) return next(e)
+    const deliveries = (await read($, deliveriesState)) ?? []
+    if (!e.props.isWorking && deliveries.length === 0) return next(e)
     const current = await read($, view)
     if (current === null) return next(e)
     const turn = (await read($, turnState)) ?? EMPTY_TURN
@@ -828,8 +905,12 @@ export const register: Register = on => {
         (current.index?.state === 'unavailable' && current.index.reason !== 'not a git repository'))
     const effectsLine = describeTurnEffects((await read($, countsState))?.turn ?? ZERO_COUNTS)
     if (!isIndexing && !isTurnShown && !isIndexShown && !isFreshError && effectsLine === null) return next(e)
+    const badges = deliveries.length > 0 ? ((await read($, badgesState)) ?? {}) : {}
+    const trails = deliveries.length > 0 ? ((await read($, trailsState)) ?? {}) : {}
+    const shown = deliveries.filter(id => badges[id] !== undefined).slice(0, MAX_DELIVERIES_SHOWN)
+    const hidden = deliveries.length - shown.length
 
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const index = describeIndex(current.index, now)
     // A failure is not about a snapshot; the rest says which index it describes.
     const indexText = current.index?.state === 'unavailable' ? index.text : `${indexLabel(current.storage)}: ${index.text}`
@@ -851,6 +932,18 @@ export const register: Register = on => {
             {effectsLine}
           </Text>
         )}
+        {shown.map((id, at) => (
+          <Button key={`jump:${id}`} hotkey={String(at + 1)} plain onPress={() => void jumpTo($, id)}>
+            <Text color="success">{describeEffects(badges[id]!) ?? ''}</Text>
+            <Text dimColor>{trails[id] ? `  "${clipQuery(trails[id]!.query)}"` : ''}</Text>
+          </Button>
+        ))}
+        {hidden > 0 && <Text dimColor>  and {hidden} more under their searches</Text>}
+        {shown.length > 0 && (
+          <Text dimColor wrap="truncate-end">
+            {`click a row, or ctrl+x tab then 1–${shown.length}, to jump to its search · ctrl+o shows how each one delivered`}
+          </Text>
+        )}
         {isIndexShown && (
           <Text color={index.color} wrap="truncate-end">
             {indexText}
@@ -866,7 +959,9 @@ export const register: Register = on => {
     )
   })
 
-  // Under a jbcontext search's row in the transcript: what it achieved so far.
+  // Under a jbcontext search's row in the transcript: what it achieved so far, and in the
+  // expanded view (ctrl+o) how: the local searches before it, what it returned, and the
+  // reads and edits of its hits since.
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     // Other rows read nothing, so the badges' writes redraw only search rows.
     if (!isJbcontextSearch(e.props.tool, e.props.input)) return next(e)
@@ -875,15 +970,46 @@ export const register: Register = on => {
     const row = await next(e)
     if (text === null) return row
     const { Box, Text } = $.ui.resolve(e)
+    if (!e.props.isExpanded) {
+      return (
+        <Box flexDirection="column">
+          {row}
+          <Text wrap="truncate-end">
+            <Text color="success">{`  ${text}`}</Text>
+            <Text dimColor>{'   ctrl+o: how'}</Text>
+          </Text>
+        </Box>
+      )
+    }
+    const trail = (await read($, trailsState))?.[e.props.tool_use_id]
+    const lines = trail ? describeTrail(trail) : []
+    const width = Math.max(0, ...lines.map(line => line.text.length))
     return (
       <Box flexDirection="column">
         {row}
-        <Text color="success" wrap="truncate-end">
-          {'  '}
-          {text}
-        </Text>
+        <Text color="success" wrap="truncate-end">{`  ${text}`}</Text>
+        {lines.map((line, at) => (
+          <Text key={`trail:${at}`} wrap="truncate-end">
+            <Text color={TRAIL_COLOR[line.kind]}>{`    ${line.mark} `}</Text>
+            {line.text.padEnd(width)}
+            <Text dimColor>{`   ${line.note}`}</Text>
+          </Text>
+        ))}
       </Box>
     )
+  })
+
+  // A run of calls the transcript folds into one line hides a search's row and its
+  // badge: a run holding a search that delivered something unfolds.
+  on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
+    if (e.props.isExpanded) return next(e)
+    const ids = e.props.calls
+      .filter(call => call.tool_use_id !== undefined && isJbcontextSearch(call.tool, call.input))
+      .map(call => call.tool_use_id!)
+    if (ids.length === 0) return next(e)
+    const badges = await read($, badgesState)
+    const isDelivered = ids.some(id => badges?.[id] !== undefined && describeEffects(badges[id]!) !== null)
+    return isDelivered ? next({ ...e, props: { ...e.props, isExpanded: true } }) : next(e)
   })
 
   // Says what jbcontext is searching for while the call runs, then how it went.

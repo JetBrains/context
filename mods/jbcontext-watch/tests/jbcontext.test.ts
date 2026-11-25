@@ -1021,7 +1021,9 @@ test('effects show under the search row and in the band, and survive a subagent 
   on('turn.start', async (_$, e) => ({ turnId: e.turnId }))
   on('command.register', async (_$, e) => ({ value: { command: e.name } }))
   on('ui.status', async () => ({ value: undefined }))
+  let groupExpanded: boolean | undefined
   on('ui.render', async ($, e) => {
+    if (e.component === 'ToolGroup') groupExpanded = (e.props as { isExpanded: boolean }).isExpanded
     const { Text } = $.ui.resolve(e)
     return h(Text, {}, 'engine') as RenderElement
   })
@@ -1077,7 +1079,34 @@ test('effects show under the search row and in the band, and survive a subagent 
     props: { tool_use_id: searchId, tool: 'mcp__jbcontext__code_search', input: { text: 'x' }, isRunning: false, isErrored: false, isInterrupted: false } as never,
   })
   expect(await row.find({ text: /found after 2 empty greps · exact lines · 2 files changed/ })).toBeDefined()
+  expect(await row.find({ text: /ctrl\+o: how/ })).toBeDefined()
   await row.unmount()
+
+  // Expanded (ctrl+o): the trail, from the empty greps to the edits on the hits.
+  const expanded = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'ToolUse',
+    props: { tool_use_id: searchId, tool: 'mcp__jbcontext__code_search', input: { text: 'x' }, isRunning: false, isErrored: false, isInterrupted: false, isExpanded: true } as never,
+  })
+  expect(await expanded.find({ text: /rg -n "RetryBackoff" src/ })).toBeDefined()
+  expect(await expanded.find({ text: /nothing found/ })).toBeDefined()
+  expect(await expanded.find({ text: /jbcontext search "where retries back off between attempts"/ })).toBeDefined()
+  expect(await expanded.find({ text: /Read src\/billing\/RetryPolicy\.kt:240-279/ })).toBeDefined()
+  expect(await expanded.find({ text: /hit #1, lines 250-251 · on the hit/ })).toBeDefined()
+  expect(await expanded.find({ text: /Edit src\/billing\/Charge\.kt:12/ })).toBeDefined()
+  await expanded.unmount()
+
+  // A folded run holding that search unfolds; one without a search stays folded.
+  const group = (calls: unknown[]) =>
+    $.ui.mount({ plugin: 'jbcontext-watch', surface: 'terminal', component: 'ToolGroup', props: { calls, isActive: false, isExpanded: false } as never })
+  const call = (tool: string, input: unknown, tool_use_id: string) => ({ tool, input, tool_use_id, isRunning: false, isErrored: false, isInterrupted: false })
+  let folded = await group([call('Bash', { command: 'rg x' }, 'other'), call('mcp__jbcontext__code_search', { text: 'x' }, searchId)])
+  expect(groupExpanded).toBe(true)
+  await folded.unmount()
+  folded = await group([call('Bash', { command: 'rg x' }, 'other')])
+  expect(groupExpanded).toBe(false)
+  await folded.unmount()
 
   const band = async () =>
     $.ui.mount({
@@ -1090,7 +1119,19 @@ test('effects show under the search row and in the band, and survive a subagent 
   // The subagent's turn start reset nothing: the band still counts the main turn's calls.
   expect(await ui.find({ text: /this turn: 4 exploration calls · 1 via jbcontext/ })).toBeDefined()
   expect(await ui.find({ text: /jbcontext delivered: 1 found after empty greps · 1 at the exact lines · 1 search → several files changed/ })).toBeDefined()
+  expect(await ui.find({ text: /jump to its search/ })).toBeDefined()
   await ui.unmount()
+
+  // Once the turn ended the band stays, with the list, until the next prompt.
+  const idle = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'AbovePrompt',
+    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 9 }, view: {} } as never,
+  })
+  expect(await idle.find({ text: /found after 2 empty greps · exact lines · 2 files changed/ })).toBeDefined()
+  expect(await idle.find({ text: /"where retries back off between attempts"/ })).toBeDefined()
+  await idle.unmount()
 
   const stored = store.get('effects:github.com/acme/widgets') as { days: Record<string, { afterEmpty: number; multiFile: number }> }
   const today = Object.values(stored.days)[0]
