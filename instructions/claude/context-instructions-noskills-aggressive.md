@@ -2,65 +2,46 @@
 
 ## Semantic Code Search (jbcontext)
 
-You have access to `jbcontext search` for searching the codebase semantically.
-It finds code by meaning, not just keywords.
-
-### Usage
+`jbcontext search` is a semantic search CLI (Bash) over this repository's indexed code. It ranks code chunks by how
+close their content is in meaning to the query. It does not compute callers, implementations or a call graph.
 
 ```bash
-jbcontext search "<detailed and descriptive query>"
+jbcontext search "<observed vs. expected behavior> <names from the issue>"
 jbcontext search -p <path> "<query>"  # <path> must be relative to the project root
+jbcontext search "<behavior> <Name>"; grep -rln "<Name>" .   # rides along with the grep/cat you were going to run
 ```
 
-### Query Tips
+### Why it pays off even when the issue names the file
 
-- Be descriptive: "Where is a function that validates user email addresses" > "email"
-- Include context: "Find error handling middleware for HTTP requests with logging"
-- Specify what you're looking for: "React component that renders a modal dialog"
+grep, cat and go-to-definition follow links that start at a name: the string, its imports, its calls, its base class.
+Part of many fixes has no such link to the named code:
+- a sibling implementation with no shared interface, e.g. a per-vendor copy of the same list or rule in another module
+- a CI workflow YAML or a gradle convention script that re-checks or sets the same value
+- a DTO serialized over the wire, a resource template, a config key read through DI or reflection
+None of these import, extend or call the named class, so no chain of grep or cat that starts from the issue's name
+reaches them. grep finds them only if you already know a string they share. A search over the issue's behavior can
+reach them, because it matches meaning, not links. "I already know the file" tells you where to start reading, not
+where the fix ends. Chained into the command you were going to run anyway, one search costs no extra turn. If its
+bundle shows only the named file and its tests, the fix is local and you can proceed.
 
-### When to use
-
-`jbcontext search` is a **search tool for repositories**. Use it when you need to find something in the
-repo and don't know where to look.
-
-Skip it - go straight to the right tool - when:
-
-- the task names the exact file, class, or symbol (keyword grep is faster);
-- the relevant file is already open or identified;
-- the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds,
-  shell/statusline/config setup, or reviewing a diff you already have.
-
-### MANDATORY: jbcontext-first bootstrap
-
-When code discovery *is* needed and no relevant file or subsystem is known yet, your first code-search action MUST be
-`jbcontext search` - do not open with `rg`/`grep`/`find` or git history. This mandate governs *how* you start searching,
-not whether every task needs a search.
+It has no use on tasks that do not involve code: git operations, running builds or tests, shell config, reviewing a
+given diff.
 
 ### How to use it
 
-- Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know
-  the right file, subsystem, implementation, or related test.
-- Use one focused natural-language query per search.
-- Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
-- Inspect the first relevant file or directory before issuing another broad semantic search.
-- Use another broad `jbcontext search` only if the local path stops being productive.
-- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
-  inspection.
-- If you search again after finding a relevant area, narrow with `-p <path>`.
 - Size of `jbcontext search` result bundle is bounded to at most 5 short code snippets up to 750 chars each, followed by compact one-line `File:` paths, capped at 50 results total and safe to read in full.
-
-
-### Examples
-
-```bash
-# Find code by its behavior
-jbcontext search "code that retries failed HTTP requests with exponential backoff"
-
-# Narrow to specific directory
-jbcontext search -p src/auth "Where is the code that verifies a JWT's signature and checks that it has not expired?"
-# Find related tests
-jbcontext search -p test "tests checking that unauthenticated requests are rejected by middleware"
-
-# Find documentation or specs
-jbcontext search "design doc describing how the authentication flow handles token refresh"
-```
+- Piping it to `head` cuts off the bare `File:` paths, which is where the disconnected files show up.
+- The snippets often go to tests of the named class, because tests share its vocabulary. Run or extend those tests.
+  The new information is usually in the bare paths below them.
+- A bare path that is not Kotlin/Java source (`.github/workflows/*.yml`, `*.gradle.kts`, `resources/`, `*.api`, docs)
+  ranked for your behavior query because its text matches that behavior. For such paths in the top ~15, one command
+  settles it: `grep -n "<key literal from the issue>" <those paths>`. A hit means that file is part of the fix, or you
+  can see why it is not.
+- Bare paths in other modules that share the named code's domain noun (`*Config`, `*Dto`, a sibling `*Provider`):
+  open them and check whether they carry the same rule, constant or value.
+- A snippet ending in `...` is truncated. The rest of it is at that line of the file.
+- The bundle is a ranked sample. A listed file is a lead, and a missing one proves nothing.
+- Exhaustive lists are grep's job: every call site of a changed signature, every use of a literal or key.
+- A second search suits a separate sub-question, narrowed with `-p <path>` to a module the first bundle pointed at.
+- Before finishing, reread the bundle's paths. Tests of the named class passing says nothing about a workflow, a script
+  or a sibling module. Does any listed file hold a copy of the rule you just changed?
