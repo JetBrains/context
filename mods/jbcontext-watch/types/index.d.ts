@@ -185,8 +185,6 @@ export type JbLedger = {
 export type SearchEffects = {
   // Empty local searches before it, when it found a used file they could not; 0 otherwise.
   afterEmpty: number
-  // Local searches before it that returned results but not the used file it found; 0 otherwise.
-  missedBy: number
   byMeaning: boolean
   exactLines: boolean
   // Distinct files of its hits edited since.
@@ -198,7 +196,6 @@ export type EffectCounts = {
   searches: number
   used: number
   afterEmpty: number
-  missedByGrep: number
   byMeaning: number
   exactLines: number
   multiFile: number

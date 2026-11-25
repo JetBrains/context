@@ -1119,7 +1119,8 @@ test('effects show under the search row and in the band, and survive a subagent 
   // The subagent's turn start reset nothing: the band still counts the main turn's calls.
   expect(await ui.find({ text: /this turn: 4 exploration calls · 1 via jbcontext/ })).toBeDefined()
   expect(await ui.find({ text: /jbcontext delivered: 1 found after empty greps · 1 at the exact lines · 1 search → several files changed/ })).toBeDefined()
-  expect(await ui.find({ text: /jump to its search/ })).toBeDefined()
+  // While Claude works the totals line alone: the list waits for the turn's end.
+  expect(await ui.find({ text: /jump to its search/ })).toBeUndefined()
   await ui.unmount()
 
   // Once the turn ended the band stays, with the list, until the next prompt.
@@ -1129,8 +1130,12 @@ test('effects show under the search row and in the band, and survive a subagent 
     component: 'AbovePrompt',
     props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 9 }, view: {} } as never,
   })
-  expect(await idle.find({ text: /found after 2 empty greps · exact lines · 2 files changed/ })).toBeDefined()
+  // The totals line gives way to its heading and a row per search.
+  expect(await idle.find({ text: /^jbcontext delivered:$/ })).toBeDefined()
+  expect(await idle.find({ text: /delivered: 1 found/ })).toBeUndefined()
+  expect(await idle.find({ text: /↳ found after 2 empty greps · exact lines · 2 files changed/ })).toBeDefined()
   expect(await idle.find({ text: /"where retries back off between attempts"/ })).toBeDefined()
+  expect(await idle.find({ text: /jump to its search/ })).toBeDefined()
   await idle.unmount()
 
   const stored = store.get('effects:github.com/acme/widgets') as { days: Record<string, { afterEmpty: number; multiFile: number }> }

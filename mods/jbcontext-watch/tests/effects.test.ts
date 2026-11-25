@@ -199,7 +199,6 @@ test('found after empty greps: credited once a hit is used, not for a read issue
 
   const { badges, counts } = run([local('empty'), local('empty'), search('s1', [hit('src/billing/RetryPolicy.kt')]), read('src/billing/RetryPolicy.kt')])
   expect(badges.s1?.afterEmpty).toBe(2)
-  expect(badges.s1?.missedBy).toBe(0)
   expect(counts.afterEmpty).toBe(1)
 
   // One empty grep counts only when it hunted for what the query asks.
@@ -209,14 +208,11 @@ test('found after empty greps: credited once a hit is used, not for a read issue
   expect(unrelated.badges.s1?.afterEmpty).toBe(0)
 })
 
-test('missed by every grep: greps returned results, none of them the used file', () => {
+test('greps that returned results earn the search no grep effect', () => {
   const missed = run([local('found', ['src/other.kt']), local('empty'), search('s1', [hit('src/a.kt')]), read('src/a.kt')])
-  expect(missed.badges.s1?.missedBy).toBe(2)
   expect(missed.badges.s1?.afterEmpty).toBe(0)
-
-  const known = run([local('found', ['src/a.kt']), search('s1', [hit('src/a.kt')]), read('src/a.kt')])
-  expect(known.badges.s1?.missedBy).toBe(0)
-  expect(known.badges.s1?.usedFiles).toBe(1)
+  expect(missed.badges.s1?.usedFiles).toBe(1)
+  expect(describeEffects(missed.badges.s1!)).not.toMatch(/grep/)
 })
 
 test('exact lines: an aimed read or edit, not a whole-file read', () => {
@@ -302,12 +298,12 @@ test('other repositories, subagents, repeated uses and the search lifetime', () 
 
 test('the badge and the band say what was achieved, nothing when nothing was', () => {
   expect(
-    describeEffects({ afterEmpty: 3, missedBy: 0, byMeaning: false, exactLines: true, filesChanged: 2, usedFiles: 2 }),
+    describeEffects({ afterEmpty: 3, byMeaning: false, exactLines: true, filesChanged: 2, usedFiles: 2 }),
   ).toBe('↳ found after 3 empty greps · exact lines · 2 files changed')
-  expect(describeEffects({ afterEmpty: 0, missedBy: 1, byMeaning: true, exactLines: false, filesChanged: 1, usedFiles: 1 })).toBe(
-    '↳ missed by 1 grep · found by meaning, not by name',
+  expect(describeEffects({ afterEmpty: 0, byMeaning: true, exactLines: false, filesChanged: 1, usedFiles: 1 })).toBe(
+    '↳ found by meaning, not by name',
   )
-  expect(describeEffects({ afterEmpty: 0, missedBy: 0, byMeaning: false, exactLines: false, filesChanged: 1, usedFiles: 1 })).toBe(null)
+  expect(describeEffects({ afterEmpty: 0, byMeaning: false, exactLines: false, filesChanged: 1, usedFiles: 1 })).toBe(null)
   expect(describeTurnEffects({ ...ZERO_COUNTS, afterEmpty: 1, exactLines: 2, multiFile: 1 })).toBe(
     'jbcontext delivered: 1 found after empty greps · 2 at the exact lines · 1 search → several files changed',
   )

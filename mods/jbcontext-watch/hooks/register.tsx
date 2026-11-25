@@ -87,6 +87,8 @@ const EFFECTS_KEY = 'effects:'
 const MAX_TRAILS = 200
 // Rows of the band's list, each pressed by its digit.
 const MAX_DELIVERIES_SHOWN = 5
+// What the band's list starts with once the turn ended.
+const DELIVERED_HEADING = 'jbcontext delivered:'
 
 const EMPTY_TURN: JbTurn = {
   explorations: 0,
@@ -882,8 +884,9 @@ export const register: Register = on => {
   })
 
   // While Claude works: the turn's exploration once it called jbcontext, an index search
-  // cannot use, and a fresh error; and what the turn's searches delivered, each a row
-  // that jumps to its search, which stays once the turn ended, until the next prompt.
+  // cannot use, a fresh error, and one line totalling what the turn's searches delivered.
+  // Once the turn ended the band stays until the next prompt, the totals giving way to
+  // the list: a row per search that delivered, which jumps to it.
   // Nothing when there is nothing of these to say.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isBandHidden))) return next(e)
@@ -905,10 +908,12 @@ export const register: Register = on => {
         (current.index?.state === 'unavailable' && current.index.reason !== 'not a git repository'))
     const effectsLine = describeTurnEffects((await read($, countsState))?.turn ?? ZERO_COUNTS)
     if (!isIndexing && !isTurnShown && !isIndexShown && !isFreshError && effectsLine === null) return next(e)
-    const badges = deliveries.length > 0 ? ((await read($, badgesState)) ?? {}) : {}
-    const trails = deliveries.length > 0 ? ((await read($, trailsState)) ?? {}) : {}
-    const shown = deliveries.filter(id => badges[id] !== undefined).slice(0, MAX_DELIVERIES_SHOWN)
-    const hidden = deliveries.length - shown.length
+    // The list waits for the turn's end: while Claude works the totals line says it all.
+    const isListed = !e.props.isWorking && deliveries.length > 0
+    const badges = isListed ? ((await read($, badgesState)) ?? {}) : {}
+    const trails = isListed ? ((await read($, trailsState)) ?? {}) : {}
+    const shown = isListed ? deliveries.filter(id => badges[id] !== undefined).slice(0, MAX_DELIVERIES_SHOWN) : []
+    const hidden = isListed ? deliveries.length - shown.length : 0
 
     const { Box, Text, Button } = $.ui.resolve(e)
     const index = describeIndex(current.index, now)
@@ -927,14 +932,20 @@ export const register: Register = on => {
             ''
           )}
         </Text>
-        {effectsLine !== null && (
+        {shown.length > 0 ? (
           <Text color="success" wrap="truncate-end">
-            {effectsLine}
+            {DELIVERED_HEADING}
           </Text>
+        ) : (
+          effectsLine !== null && (
+            <Text color="success" wrap="truncate-end">
+              {effectsLine}
+            </Text>
+          )
         )}
         {shown.map((id, at) => (
           <Button key={`jump:${id}`} hotkey={String(at + 1)} plain onPress={() => void jumpTo($, id)}>
-            <Text color="success">{describeEffects(badges[id]!) ?? ''}</Text>
+            <Text color="success">{`  ${describeEffects(badges[id]!) ?? ''}`}</Text>
             <Text dimColor>{trails[id] ? `  "${clipQuery(trails[id]!.query)}"` : ''}</Text>
           </Button>
         ))}

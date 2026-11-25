@@ -1,12 +1,11 @@
 // A search's hit counts once it is used: its file read or edited after the search
-// finished. Five effects are credited to a search:
+// finished. Four effects are credited to a search:
 //  1. afterEmpty  - local searches came up empty, then it found a file that got used;
 //  2. byMeaning   - a used file shares no word with the query;
 //  3. exactLines  - a read or an edit landed on the lines it pointed at;
-//  4. missedBy    - local searches returned results, none of them the used file it found;
-//  5. filesChanged - several of its files got edited.
-// 1, 2 and 4 claim a discovery, so they go only to the first search of the turn that
-// listed the file and only when the turn had not seen the file before; 3 and 5 go to
+//  4. filesChanged - several of its files got edited.
+// 1 and 2 claim a discovery, so they go only to the first search of the turn that
+// listed the file and only when the turn had not seen the file before; 3 and 4 go to
 // every search that held it.
 
 import type {
@@ -561,7 +560,6 @@ export function isAimed(detail: UseDetail, file: Pick<HitFile, 'ranges' | 'snipp
 
 export const NO_EFFECTS: SearchEffects = {
   afterEmpty: 0,
-  missedBy: 0,
   byMeaning: false,
   exactLines: false,
   filesChanged: 0,
@@ -578,7 +576,6 @@ export function evaluate(search: SearchRecord): SearchEffects {
   const isEmptyHunt = window.empty >= 2 || (window.empty >= 1 && sharesWord(queryWords, patternWords))
   return {
     afterEmpty: discovered.length > 0 && window.nonEmpty === 0 && isEmptyHunt ? window.empty : 0,
-    missedBy: discovered.length > 0 && window.nonEmpty >= 1 ? window.empty + window.nonEmpty : 0,
     byMeaning:
       queryWords.size >= 2 &&
       discovered.some(file => !sharesWord(queryWords, tokens(`${file.path} ${file.snippet.join(' ')}`))),
@@ -592,7 +589,6 @@ export function evaluate(search: SearchRecord): SearchEffects {
 export function mergeEffects(a: SearchEffects, b: SearchEffects): SearchEffects {
   return {
     afterEmpty: Math.max(a.afterEmpty, b.afterEmpty),
-    missedBy: Math.max(a.missedBy, b.missedBy),
     byMeaning: a.byMeaning || b.byMeaning,
     exactLines: a.exactLines || b.exactLines,
     filesChanged: Math.max(a.filesChanged, b.filesChanged),
@@ -604,7 +600,6 @@ export const ZERO_COUNTS: EffectCounts = {
   searches: 0,
   used: 0,
   afterEmpty: 0,
-  missedByGrep: 0,
   byMeaning: 0,
   exactLines: 0,
   multiFile: 0,
@@ -618,7 +613,6 @@ export function countDelta(before: SearchEffects, after: SearchEffects): EffectC
     ...ZERO_COUNTS,
     used: turnedOn(before.usedFiles > 0, after.usedFiles > 0),
     afterEmpty: turnedOn(before.afterEmpty > 0, after.afterEmpty > 0),
-    missedByGrep: turnedOn(before.missedBy > 0, after.missedBy > 0),
     byMeaning: turnedOn(before.byMeaning, after.byMeaning),
     exactLines: turnedOn(before.exactLines, after.exactLines),
     multiFile: turnedOn(before.filesChanged >= 2, after.filesChanged >= 2),
@@ -767,7 +761,6 @@ function plural(count: number, word: string): string {
 export function describeEffects(effects: SearchEffects): string | null {
   const parts: string[] = []
   if (effects.afterEmpty > 0) parts.push(`found after ${plural(effects.afterEmpty, 'empty grep')}`)
-  if (effects.missedBy > 0) parts.push(`missed by ${plural(effects.missedBy, 'grep')}`)
   if (effects.byMeaning) parts.push('found by meaning, not by name')
   if (effects.exactLines) parts.push('exact lines')
   if (effects.filesChanged >= 2) parts.push(`${effects.filesChanged} files changed`)
@@ -778,7 +771,6 @@ export function describeEffects(effects: SearchEffects): string | null {
 export function describeTurnEffects(counts: EffectCounts): string | null {
   const parts: string[] = []
   if (counts.afterEmpty > 0) parts.push(`${counts.afterEmpty} found after empty greps`)
-  if (counts.missedByGrep > 0) parts.push(`${counts.missedByGrep} missed by greps`)
   if (counts.byMeaning > 0) parts.push(`${counts.byMeaning} found by meaning`)
   if (counts.exactLines > 0) parts.push(`${counts.exactLines} at the exact lines`)
   if (counts.multiFile > 0) parts.push(`${plural(counts.multiFile, 'search')} → several files changed`)
