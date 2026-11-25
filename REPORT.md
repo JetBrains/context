@@ -257,3 +257,90 @@ To understand why `exp_bounded_neutral_v1` still produced `| head -60` (rather t
    - **Per-file snippet deduplication**: `45.0%` of snippet slots in unpiped runs (`50.7%` of live calls) are duplicate chunks of `#1`, wasting slots that could surface distinct production files.
    - **Enriching the bare `File:` tail (`#6+`)**: Opus ignored `84.6%` of bare paths (`33/39`), including gold file `#11 YouTrackFixedIssuesParser.kt`. Adding enclosing symbol + line range (`path:start-end › Class.method`), `[main|test|testdata]` tags, score/cliff markers, and collapsing testData/PSI dumps directly targets both tail utilization and trust.
 3. **Skip-behavior takeaway**: `70.3%` of Opus's zero-call skips (`116/165`) already hit a gold file on Turn 1 via verbatim anchors; forcing `jbcontext` on exact-anchor tasks is likely net negative, whereas narrowing skip rules only matters for multi-file/indirect tasks (e.g., `jcp-433`).
+
+## Skipping `jbcontext` when the issue names the location: blast-area instruction
+
+### 1. Problem and intention
+
+In the live run `jcp-1931570`, 31.6% of trials never call `jbcontext`, and this is decided per issue: 93.1% of issues behave the same on all 3 seeds. The skip rate goes up with how much the issue reveals: 60.2% skip when the issue names any gold file, class or symbol, versus 17.7% when it names none. The installed `CLAUDE.md` describes `jbcontext` as a tool for finding where to look, and it tells the agent to skip it "when the task names the exact file, class, or symbol". So once the issue gives a location, the agent opens or greps it on turn 1.
+
+The aim was to describe `jbcontext` as a **blast-area retriever** instead: one call returns the code related to the issue, including code that grep and cat can't reach from the name in the issue. The instruction should be neutral, with no rule forcing a search first; the agent should choose the search on its own. Each wording was drafted by `claude-opus-5-5` (effort `high`) from a brief containing our evidence and intention.
+
+### 2. Instruction variants
+
+| Variant | File (`local-lab/instruction-candidates/`) | Core framing |
+|---|---|---|
+| Current | `instructions/claude/context-instructions-noskills-aggressive.md` | Exploration tool: "use when you don't know where to look", with explicit skip rules for named files/symbols |
+| Neutral v1 | `context-instructions-blast-area-neutral.md` | Removes the skip rules; a "What each tool shows" comparison (`cat` = one file, `grep` = "complete for that string", `jbcontext` = "a ranked sample") plus the reasoning "the issue rarely tells you whether a fix is single-file" |
+| Explicit | `context-instructions-blast-area-explicit.md` | Hard rule: the first discovery action is one `jbcontext search` built from the behavior + the names in the issue |
+| Neutral v2 | `context-instructions-blast-area-neutral-v2.md` | Section "Why it pays off even when the issue names the file": lists the kinds of files that have **no import, call or base-class link** to the named code (per-vendor sibling copies, CI workflow YAML / gradle scripts, DTOs / resources / DI config keys), so no grep or cat chain that starts from the name reaches them. Key line: *"I already know the file" tells you where to start reading, not where the fix ends.* The example chains the search with a grep (`jbcontext search "<behavior> <Name>"; grep -rln "<Name>" .`). `How to use it` keeps the bounded-output bullet and adds advice on bare non-source paths, sibling modules, and rereading the bundle before finishing |
+
+The explicit variant's "callers" / "sibling implementations" wording was wrong, because `jbcontext` doesn't compute a call graph. Neutral v2 states that honestly: *"It does not compute callers, implementations or a call graph."*
+
+### 3. Task selection
+
+There were five local tasks: one where the issue fully reveals the location and four where it reveals it moderately.
+
+| Task | How much the issue reveals | Gold files | Live `jcp-1931570` calls |
+|---|---|---:|---|
+| `jcp-433` | **Fully**: exact gold paths plus a stack trace | 4 | 0/3 |
+| `jcp-434` | Moderately: module and package names (`ClientCodegenConfig`) | 3 | 0/3 |
+| `129` | Moderately: names `CodeBlockAtOffsetProvider` | 2 | called |
+| `340` | Moderately: names `RepoMap` / `LabeledEdge` | 1 | called |
+| `aip-431` | Moderately: only "Country ISO white list" | 3 | called |
+
+### 4. Results
+
+All runs used `claude-opus-5-5` at `medium` effort with `jbcontext 0.9.21.1593 --auto` and `--prompts-source local`. Every trial loaded the intended instruction (`parity_ok=True`).
+
+**Single-seed screen (current vs. neutral v1 vs. explicit, `exp_blast_neutral_v1` / `exp_blast_explicit_v1`):**
+
+| Task | Current | Neutral v1 | Explicit |
+|---|---|---|---|
+| `jcp-433` | 0 | 0 | **1** |
+| `jcp-434` | 1 (`head`) | 0 | **1** |
+| `129` | 1 (`head`) | 0 | **1** |
+| `340` | 0 | **1** | **1** |
+| `aip-431` | 1 (`head`) | 0 | **1** |
+| **Calls / solved / cost** | 3/5, 2/5, `$2.21` | **1/5**, 2/5, `$2.86` | **5/5**, 3/5, `$2.22` |
+
+**3-seed comparison (neutral v1 vs. neutral v2; v1 = `exp_blast_neutral_v1` + `exp_blast_neutral_v1b_s1..s2`, v2 = `exp_blast_neutral_v2_s1..s3`):**
+
+| Task | Reveals | v1 calls | **v2 calls** | v1 solved | v2 solved | v1 cost | v2 cost |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `jcp-433` | Fully | 0/3 | **0/3** | 0/3 | 0/3 | `$1.70` | `$1.82` |
+| `jcp-434` | Moderately | 1/3 (`head`) | **3/3** | 3/3 | 3/3 | `$0.93` | `$0.83` |
+| `129` | Moderately | 0/3 | **3/3** | 1/3 | 0/3 | `$2.88` | `$2.65` |
+| `340` | Moderately | 2/3 (1 `head`) | **3/3** | 0/3 | 1/3 | `$1.09` | `$1.04` |
+| `aip-431` | Moderately | 0/3 | **3/3** | 2/3 | 1/3 | `$0.70` | `$0.66` |
+| **Total** | | **3/15** | **12/15** | 6/15 | 5/15 | `$7.30` | `$7.00` |
+
+- **Neutral v2 got the search called on every moderately revealing task (12/12 trials).** The only task it never got called on was `jcp-433`, where the issue gives exact gold paths plus a stack trace. That issue is too strong an attractor for wording alone. Only the explicit rule got a call there, and even then the agent went straight to the files the issue named.
+- **Neutral v1 did worse than the current instruction (3/15 vs. 3/5 single-seed).** Opus's diagnosis: the "What each tool shows" comparison argues *for* grep ("complete for that string" beats "a ranked sample"), and dropping "use it when you don't know where to look" also removed the cue for concept-only issues like `aip-431`.
+- **Cost stayed flat or went down** (`$7.00` vs. `$7.30`), and no run over-called: there was 1 search per calling trial.
+- **The solve-rate difference (5/15 vs. 6/15) is within seed noise** for n=3 per task. Call rate is the reliable signal.
+
+### 5. Did the search surface files that grep from the issue's names could not reach?
+
+- **`jcp-434`, the clearest payoff:** v2 edited the gold workflow `.github/workflows/reusable-publish-generated-client.yml` in **3/3** runs, versus **0/3** for v1. This file has no code link to `ClientCodegenConfig`. The one v1 run that searched saw it at #6 in the results and ignored it; the v1 runs that only grepped never saw it. No run in either variant found the third gold file, `FeatureFlagDto.kt` (0/6).
+- **`aip-431`, results shown but not acted on:** v2 ranked all three per-provider country allowlists at #1–#3 in 3/3 runs. Only one run edited all three, and it is the only one that passed. One run never opened the OpenAI/Anthropic lists; another read them and still edited only `JetBrainsAICountries.kt`. The failing tests check exactly those two lists. (The issue text also swaps the GP/GI codes.)
+- **`129`:** v2 surfaced `PsiJavaScriptCodeBlockProvider.kt` (a gold file the issue doesn't name) in 2/3 runs, and the agent opened it. Both variants edit both gold files in every run, so the failures come from the fix logic, not from missing files.
+- **`340`:** the only gold file is named in the issue, so the search had nothing extra to add.
+- **`jcp-433`:** in every variant, the agent edits all 4 gold files and the task still fails. It is a fix-logic failure, so it can't measure blast-area recall.
+
+### 6. Side effects
+
+- **Some piping came back under v2.** Turn-1 pipe modes across the 12 calls: 7 unpiped, 3 `| grep File:` (`jcp-434` s1, `aip-431` s2/s3), 2 other pipes (`129` s1/s3), and 0 `| head`. `head` piping stays gone. The new "bare paths are where the disconnected files show up" line seems to push some runs into `| grep File:` instead, which throws away the snippets.
+- **Calling the search is no longer the bottleneck; acting on the results is.** On `aip-431` the agent sees all the parallel copies and still edits one. On `jcp-434` it never reaches `FeatureFlagDto.kt`.
+
+### 7. Insights
+
+1. **Describing the search as reaching code with no structural link to the named class works, but only when phrased concretely.** "Structurally disconnected" is abstract. "No import, no call, no base class, so no grep/cat chain from the name reaches it" is something Opus can check in its head against its own plan, and it flips the turn-1 decision on moderately revealing issues (3/15 → 12/15).
+2. **Comparing the tools side by side backfires.** When the instruction compares `grep` ("complete") with `jbcontext` ("a sample"), Opus picks completeness whenever it already has a name. The instruction should describe what *only* the search can reach, not rank the tools.
+3. **Chaining the search with grep removes the cost of calling it.** Pairing the search with the grep the agent was going to run anyway means calling it costs no extra turn.
+4. **An exact path plus a stack trace is still beyond wording.** For `jcp-433`-type issues, the options are the explicit rule (which gets the call but doesn't change what the agent does next) or the `PrefetchHook`. Since the agent already reaches all gold files on such issues, the payoff of forcing the search there is small.
+5. **The next lever is getting the agent to act on the results:**
+   - an instruction line saying to apply the fix to every parallel copy the bundle shows;
+   - a way to stop `| grep File:` without losing the bare-path advice;
+   - formatter changes: one matched line per bare `File:` path, at most 1 snippet per file (on `jcp-434`, 4 of 5 snippets came from `ClientCodegenConfigTest.kt`), and removing the "Update … available" line.
+6. **Next validation:** run neutral v2 with ≥3 seeds on all 12 local tasks (`all12`), including tasks the instruction's examples don't describe, to check for overfitting. Measure both the call rate and whether the agent opens a result file it couldn't have reached from the issue's names. After that, run a full 522-trial TeamCity eval.

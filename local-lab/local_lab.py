@@ -871,14 +871,36 @@ def _extract_jbcontext_output_files(txt: str) -> tuple[set[str], set[str]]:
     all_files: set[str] = set()
     snippet_files: set[str] = set()
     cur_file = ""
+    in_related = False
     for ln in (txt or "").splitlines():
-        m = re.match(r"^\s*\d+\.\s+File:\s+(.+?)\s*$", ln)
+        m = re.match(
+            r"^\s*\d+\.\s+(?:\[[a-z-]+\]\s+)?(?:[^:]+:\s+)?File:\s+(.+?)(?:\s+\(\d+L\))?(?:\s+\[[^\]]+\])?\s*$",
+            ln,
+        )
         if m:
+            in_related = False
             cur_file = _norm_repo_path(m.group(1))
             if cur_file:
                 all_files.add(cur_file)
             continue
-        if cur_file and ln.strip().startswith("Content:"):
+        if re.match(r"^\s*Related tests(?:\s*\([^)]*\))?:\s*$", ln):
+            cur_file = ""
+            in_related = True
+            continue
+        if re.match(r"^\s*Related test data(?:\s*\([^)]*\))?:\s*$", ln):
+            cur_file = ""
+            in_related = False
+            continue
+        if in_related:
+            mt = re.match(r"^\s*-\s+(?:\[[a-z-]+\]\s+)?(.+?)(?:\s+\(\d+L\))?(?:\s+\[[^\]]+\])?\s*$", ln)
+            if mt:
+                tf = _norm_repo_path(mt.group(1))
+                if tf:
+                    all_files.add(tf)
+            elif not ln.strip():
+                in_related = False
+            continue
+        if cur_file and (ln.strip().startswith("Content:") or re.match(r"^\s+\d+\|", ln)):
             snippet_files.add(cur_file)
     return all_files, snippet_files
 

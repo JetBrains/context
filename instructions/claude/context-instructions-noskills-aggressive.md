@@ -2,8 +2,8 @@
 
 ## Semantic Code Search (jbcontext)
 
-`jbcontext search` is a semantic search CLI (Bash) over this repository's indexed code. It ranks code chunks by how
-close their content is in meaning to the query. It does not compute callers, implementations or a call graph.
+`jbcontext search` is a semantic search CLI (Bash) over this repository's indexed code. It ranks code by how close
+its content is in meaning to the query. It does not compute callers, implementations or a call graph.
 
 ```bash
 jbcontext search "<observed vs. expected behavior> <names from the issue>"
@@ -27,21 +27,25 @@ bundle shows only the named file and its tests, the fix is local and you can pro
 It has no use on tasks that do not involve code: git operations, running builds or tests, shell config, reviewing a
 given diff.
 
-### How to use it
+### Reading the output and acting on it
 
-- Size of `jbcontext search` result bundle is bounded to at most 5 short code snippets up to 750 chars each, followed by compact one-line `File:` paths, capped at 50 results total and safe to read in full.
-- Piping it to `head` cuts off the bare `File:` paths, which is where the disconnected files show up.
-- The snippets often go to tests of the named class, because tests share its vocabulary. Run or extend those tests.
-  The new information is usually in the bare paths below them.
-- A bare path that is not Kotlin/Java source (`.github/workflows/*.yml`, `*.gradle.kts`, `resources/`, `*.api`, docs)
-  ranked for your behavior query because its text matches that behavior. For such paths in the top ~15, one command
-  settles it: `grep -n "<key literal from the issue>" <those paths>`. A hit means that file is part of the fix, or you
-  can see why it is not.
-- Bare paths in other modules that share the named code's domain noun (`*Config`, `*Dto`, a sibling `*Provider`):
-  open them and check whether they carry the same rule, constant or value.
-- A snippet ending in `...` is truncated. The rest of it is at that line of the file.
-- The bundle is a ranked sample. A listed file is a lead, and a missing one proves nothing.
-- Exhaustive lists are grep's job: every call site of a changed signature, every use of a literal or key.
-- A second search suits a separate sub-question, narrowed with `-p <path>` to a module the first bundle pointed at.
-- Before finishing, reread the bundle's paths. Tests of the named class passing says nothing about a workflow, a script
-  or a sibling module. Does any listed file hold a copy of the rule you just changed?
+- Output is compact (~40-80 lines / ~1k tokens, smaller than one source file), deduplicated and capped. Run it
+  unpiped: `head`, `tail` or `grep` drop ranked hits, role descriptors, or `Related tests:`.
+- Numbered entries are non-test files, best first: `[role] File: <path> (NL) [used by:/refs:/peers:]`, where
+  `[role]` is `[main|data|ci|build|config|schema|docs]` and `(NL)` is total lines, followed by whole matched entity
+  spans `Lstart-end: Class > signature` and a 1-line `does:` or `values:` role digest (never raw truncated code).
+- `Related tests:` at the bottom lists `[test] <path> (NL) [spans]`. Run or extend those tests; fixes rarely live only there.
+- Batch-read suspects on the next turn using the exact sizes and spans: `cat` files under ~150L, `sed -n S,Ep` spans
+  of larger ones (`cat A.kt B.kt; sed -n 59,119p C.kt`).
+- Check `refs:` / `used by:` callees and short `<= 40L` helpers (parsers, mappers, DTOs, queries) that feed your code:
+  their `does:` digest shows what they actually do (vs. what you assume). Fix root causes where they live instead of
+  working around a defective callee.
+- When the result surfaces `peers:` or parallel per-vendor/per-module copies of the same list, constant or policy
+  (`*Countries`, `*Config`, `*Provider`), read all of them in parallel on Turn 2 and update every copy unless the
+  issue explicitly restricts scope to one provider.
+- Non-source entries (`[ci]`, `[build]`, `[config]`, `[schema]`, `[docs]`) ranked because their text matches your
+  behavior. Check their `values:` preview or run `grep -n "<key literal from the issue>" <those paths>` to settle them.
+- The result is a ranked sample: absence proves nothing. Exhaustive lists (every call site or use of a key) are grep's
+  job. A second search with `-p <path>` suits a separate sub-question.
+- Before finishing, reread the listed entries and `peers:`. Unit tests of one class passing says nothing about a
+  workflow, a script or a sibling module. Does any listed file hold a copy of the rule you just changed?
