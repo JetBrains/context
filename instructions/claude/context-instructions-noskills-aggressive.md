@@ -2,63 +2,50 @@
 
 ## Semantic Code Search (jbcontext)
 
-You have access to `jbcontext search` for searching the codebase semantically.
-It finds code by meaning, not just keywords.
-
-### Usage
+`jbcontext search` is a semantic search CLI (Bash) over this repository's indexed code. It ranks code by how close
+its content is in meaning to the query. It does not compute callers, implementations or a call graph.
 
 ```bash
-jbcontext search "<detailed and descriptive query>"
+jbcontext search "<observed vs. expected behavior> <names from the issue>"
 jbcontext search -p <path> "<query>"  # <path> must be relative to the project root
+jbcontext search "<behavior> <Name>"; grep -rln "<Name>" .   # rides along with the grep/cat you were going to run
 ```
 
-### Query Tips
+### Why it pays off even when the issue names the file
 
-- Be descriptive: "Where is a function that validates user email addresses" > "email"
-- Include context: "Find error handling middleware for HTTP requests with logging"
-- Specify what you're looking for: "React component that renders a modal dialog"
+grep, cat and go-to-definition follow links that start at a name: the string, its imports, its calls, its base class.
+Part of many fixes has no such link to the named code:
+- a sibling implementation with no shared interface, e.g. a per-vendor copy of the same list or rule in another module
+- a CI workflow YAML or a gradle convention script that re-checks or sets the same value
+- a DTO serialized over the wire, a resource template, a config key read through DI or reflection
+None of these import, extend or call the named class, so no chain of grep or cat that starts from the issue's name
+reaches them. grep finds them only if you already know a string they share. A search over the issue's behavior can
+reach them, because it matches meaning, not links. "I already know the file" tells you where to start reading, not
+where the fix ends. Chained into the command you were going to run anyway, one search costs no extra turn. If its
+bundle shows only the named file and its tests, the fix is local and you can proceed.
 
-### When to use
+It has no use on tasks that do not involve code: git operations, running builds or tests, shell config, reviewing a
+given diff.
 
-`jbcontext search` is a **search tool for repositories**. Use it when you need to find something in the
-repo and don't know where to look.
+### Reading the output and acting on it
 
-Skip it - go straight to the right tool - when:
-
-- the task names the exact file, class, or symbol (keyword grep is faster);
-- the relevant file is already open or identified;
-- the task doesn't involve locating code at all - git operations (rebase, merge, commit), running tests or builds,
-  shell/statusline/config setup, or reviewing a diff you already have.
-
-### MANDATORY: jbcontext-first bootstrap
-
-When code discovery *is* needed and no relevant file or subsystem is known yet, your first code-search action MUST be
-`jbcontext search` - do not open with `rg`/`grep`/`find` or git history. This mandate governs *how* you start searching,
-not whether every task needs a search.
-
-### How to use it
-
-- Start with `jbcontext search` before planning, editing, or exact search in unfamiliar code when you do not yet know
-  the right file, subsystem, implementation, or related test.
-- Use one focused natural-language query per search.
-- Do not start with grep, ripgrep, or find when the search problem is still semantic or exploratory.
-- Inspect the first relevant file or directory before issuing another broad semantic search.
-- Use another broad `jbcontext search` only if the local path stops being productive.
-- Once you know the relevant file, symbol, or directory, switch to direct file reads or exact search for local
-  inspection.
-- If you search again after finding a relevant area, narrow with `-p <path>`.
-
-### Examples
-
-```bash
-# Find code by its behavior
-jbcontext search "code that retries failed HTTP requests with exponential backoff"
-
-# Narrow to specific directory
-jbcontext search -p src/auth "Where is the code that verifies a JWT's signature and checks that it has not expired?"
-# Find related tests
-jbcontext search -p test "tests checking that unauthenticated requests are rejected by middleware"
-
-# Find documentation or specs
-jbcontext search "design doc describing how the authentication flow handles token refresh"
-```
+- Output is compact (~40-80 lines / ~1k tokens, smaller than one source file), deduplicated and capped. Run it
+  unpiped: `head`, `tail` or `grep` drop ranked hits, role descriptors, or `Related tests:`.
+- Numbered entries are non-test files, best first: `[role] File: <path> (NL) [used by:/refs:/peers:]`, where
+  `[role]` is `[main|data|ci|build|config|schema|docs]` and `(NL)` is total lines, followed by whole matched entity
+  spans `Lstart-end: Class > signature` and a 1-line `does:` or `values:` role digest (never raw truncated code).
+- `Related tests:` at the bottom lists `[test] <path> (NL) [spans]`. Run or extend those tests; fixes rarely live only there.
+- Batch-read suspects on the next turn using the exact sizes and spans: `cat` files under ~150L, `sed -n S,Ep` spans
+  of larger ones (`cat A.kt B.kt; sed -n 59,119p C.kt`).
+- Check `refs:` / `used by:` callees and short `<= 40L` helpers (parsers, mappers, DTOs, queries) that feed your code:
+  their `does:` digest shows what they actually do (vs. what you assume). Fix root causes where they live instead of
+  working around a defective callee.
+- When the result surfaces `peers:` or parallel per-vendor/per-module copies of the same list, constant or policy
+  (`*Countries`, `*Config`, `*Provider`), read all of them in parallel on Turn 2 and update every copy unless the
+  issue explicitly restricts scope to one provider.
+- Non-source entries (`[ci]`, `[build]`, `[config]`, `[schema]`, `[docs]`) ranked because their text matches your
+  behavior. Check their `values:` preview or run `grep -n "<key literal from the issue>" <those paths>` to settle them.
+- The result is a ranked sample: absence proves nothing. Exhaustive lists (every call site or use of a key) are grep's
+  job. A second search with `-p <path>` suits a separate sub-question.
+- Before finishing, reread the listed entries and `peers:`. Unit tests of one class passing says nothing about a
+  workflow, a script or a sibling module. Does any listed file hold a copy of the rule you just changed?
