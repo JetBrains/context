@@ -1,8 +1,7 @@
 ## Multi-Repo Search (jbcontext)
 
 Your indexed context is not limited to the current 
-checkout: `jbcontext` searches every repository you have access to, not just the current checkout. Prefer the
-`/org-search`, `/dependency-search`, and `/blast-radius` skills; the commands below are the fallback.
+checkout: `jbcontext` searches every repository you have access to, not just the current checkout.
 
 Go org-wide once the local answer is missing or insufficient - typically when the symbol, service, or
 table is defined elsewhere, when you need prior art, or when a shared contract or dependency change
@@ -17,4 +16,4 @@ jbcontext search --git-remote-url "<repo url from jbcontext repos>" --limit 10 "
 
 - A prefix such as `jcp-*` is a repo-family constraint: query it literally and keep every match.
 - Report which repos you searched and what matched; if nothing matched, say which filters you tried.
-- Open the full file (e.g. via `gh`) before stating a cross-repo snippet as fact - the index may lag.
+- Open the full file before stating a cross-repo snippet as fact - the index may lag: read it from the local checkout if it is on disk, otherwise use `gh` if available.
