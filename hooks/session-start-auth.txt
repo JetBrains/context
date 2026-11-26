@@ -1,0 +1,1 @@
+jbcontext: not logged in to Air Context, so semantic code search is unavailable in this session. Run "jbcontext login" in a terminal, then start a new session.
