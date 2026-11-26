@@ -2,8 +2,9 @@
   "$comment": [
     "Cell codex+gpt-6.1-terra+medium of BenchRoom (many files, large repos), exported from the Agentic Benchmark page on the run pair below.",
     "jbcontext 0.9.19.1421 on the release channel, codex 0.167.0, flags --auto.",
-    "Warning: Missing metrics: costUsd — unavailable for comparison, not published.",
+    "Warning: Older-run fallback: using build 7567138 instead of latest stable build 7731786; newer run pairs were excluded.",
     "The arm run WITHOUT jbcontext: TeamCity build #44, the baseline of this declared configuration.",
+    "costUsd: mean USD per task, from the run's trajectory analysis (avg_cost_usd)",
     "turns: mean primary-agent steps per task, from the junie_primary_steps_avg build statistic",
     "toolCalls: mean tool calls per task, from the junie_number_tool_calls_avg build statistic",
     "latencyMs: mean wall clock per task, from the run's trajectory analysis (avg_duration_seconds); the CLI reads it as explorationTime"
@@ -21,6 +22,7 @@
     "startedAt": "20261108T001713+0000"
   },
   "metrics": {
+    "costUsd": 0.211,
     "turns": 0.98,
     "toolCalls": 62.81,
     "latencyMs": 215419.0
