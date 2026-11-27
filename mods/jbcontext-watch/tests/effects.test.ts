@@ -6,6 +6,7 @@ import {
   addToDay,
   classifyCall,
   describeEffects,
+  describeTrail,
   describeTurnEffects,
   diffBadges,
   evaluate,
@@ -19,6 +20,7 @@ import {
   toRepoPath,
   tokenMatch,
   tokens,
+  trailOf,
 } from '../hooks/effects'
 import type { LedgerEvent, ParsedHit, UseDetail } from '../hooks/effects'
 import type { JbLedger } from '../types'
@@ -314,4 +316,40 @@ test('daily totals add up and keep the newest days', () => {
   expect(two.days['2026-11-18']).toEqual({ ...ZERO_COUNTS, afterEmpty: 2, exactLines: 1 })
   const kept = addToDay(addToDay(two, '2026-11-19', ZERO_COUNTS, 2), '2026-11-20', ZERO_COUNTS, 2)
   expect(Object.keys(kept.days)).toEqual(['2026-11-19', '2026-11-20'])
+})
+
+test('a trail tells the local searches before a search, what it returned, and the uses of its hits', () => {
+  const { ledger } = run([
+    { ...local('empty', [], ['BackoffSchedule']), id: 'g1', label: 'grep -rn BackoffSchedule src' } as LedgerEvent,
+    { ...local('found', ['src/other.kt', 'src/more.kt'], ['retry']), id: 'g2', label: 'rg -l retry src' } as LedgerEvent,
+    search('s1', [hit('src/a.kt', 120, 3, ['fun appendEvent(event: StatsEvent) {']), hit('src/b.kt', null)], 'where is the backoff schedule'),
+    { ...read('src/a.kt', 115, 140), id: 'r1', tool: 'Read' } as LedgerEvent,
+    { ...edit('src/b.kt', [{ start: 7, end: 7 }]), id: 'e1', tool: 'Edit' } as LedgerEvent,
+  ])
+  const trail = trailOf(ledger.searches[0]!)
+  expect(trail.before.map(step => [step.id, step.outcome, step.files])).toEqual([
+    ['g1', 'empty', 0],
+    ['g2', 'found', 2],
+  ])
+  expect(trail.target).toBe('src/a.kt')
+  expect(trail.uses.map(use => [use.id, use.rank, use.lines, use.hit, use.exact])).toEqual([
+    ['r1', 1, { start: 115, end: 140 }, { start: 120, end: 122 }, true],
+    ['e1', 2, { start: 7, end: 7 }, null, false],
+  ])
+  expect(describeTrail(trail).map(line => `${line.mark} ${line.text} | ${line.note}`)).toEqual([
+    '✗ grep -rn BackoffSchedule src | nothing found',
+    '○ rg -l retry src | 2 files, not src/a.kt',
+    '● jbcontext search "where is the backoff schedule" | 2 hits in 2 files',
+    '▸ Read src/a.kt:115-140 | hit #1, lines 120-122 · on the hit',
+    '✎ Edit src/b.kt:7 | hit #2',
+    // Neither file shares a word with "backoff schedule".
+    '≈ src/a.kt | no word of the query in its path or snippet',
+    '≈ src/b.kt | no word of the query in its path or snippet',
+  ])
+
+  // A whole-file read, and a use the badge already counted, still go on the trail.
+  const path = 'src/stats/StatsWriter.kt'
+  const again = run([search('s2', [hit(path)], 'stats writer'), read(path, 1, 900, false), read(path, 30, 50)])
+  const lines = describeTrail(trailOf(again.ledger.searches[0]!)).map(line => line.text)
+  expect(lines).toEqual(['jbcontext search "stats writer"', `Read ${path} (whole file)`, `Read ${path}:30-50`])
 })

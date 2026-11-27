@@ -1021,7 +1021,9 @@ test('effects show under the search row and in the band, and survive a subagent 
   on('turn.start', async (_$, e) => ({ turnId: e.turnId }))
   on('command.register', async (_$, e) => ({ value: { command: e.name } }))
   on('ui.status', async () => ({ value: undefined }))
+  let groupExpanded: boolean | undefined
   on('ui.render', async ($, e) => {
+    if (e.component === 'ToolGroup') groupExpanded = (e.props as { isExpanded: boolean }).isExpanded
     const { Text } = $.ui.resolve(e)
     return h(Text, {}, 'engine') as RenderElement
   })
@@ -1077,7 +1079,34 @@ test('effects show under the search row and in the band, and survive a subagent 
     props: { tool_use_id: searchId, tool: 'mcp__jbcontext__code_search', input: { text: 'x' }, isRunning: false, isErrored: false, isInterrupted: false } as never,
   })
   expect(await row.find({ text: /found after 2 empty greps · exact lines · 2 files changed/ })).toBeDefined()
+  expect(await row.find({ text: /ctrl\+o: how/ })).toBeDefined()
   await row.unmount()
+
+  // Expanded (ctrl+o): the trail, from the empty greps to the edits on the hits.
+  const expanded = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'ToolUse',
+    props: { tool_use_id: searchId, tool: 'mcp__jbcontext__code_search', input: { text: 'x' }, isRunning: false, isErrored: false, isInterrupted: false, isExpanded: true } as never,
+  })
+  expect(await expanded.find({ text: /rg -n "RetryBackoff" src/ })).toBeDefined()
+  expect(await expanded.find({ text: /nothing found/ })).toBeDefined()
+  expect(await expanded.find({ text: /jbcontext search "where retries back off between attempts"/ })).toBeDefined()
+  expect(await expanded.find({ text: /Read src\/billing\/RetryPolicy\.kt:240-279/ })).toBeDefined()
+  expect(await expanded.find({ text: /hit #1, lines 250-251 · on the hit/ })).toBeDefined()
+  expect(await expanded.find({ text: /Edit src\/billing\/Charge\.kt:12/ })).toBeDefined()
+  await expanded.unmount()
+
+  // A folded run holding that search unfolds; one without a search stays folded.
+  const group = (calls: unknown[]) =>
+    $.ui.mount({ plugin: 'jbcontext-watch', surface: 'terminal', component: 'ToolGroup', props: { calls, isActive: false, isExpanded: false } as never })
+  const call = (tool: string, input: unknown, tool_use_id: string) => ({ tool, input, tool_use_id, isRunning: false, isErrored: false, isInterrupted: false })
+  let folded = await group([call('Bash', { command: 'rg x' }, 'other'), call('mcp__jbcontext__code_search', { text: 'x' }, searchId)])
+  expect(groupExpanded).toBe(true)
+  await folded.unmount()
+  folded = await group([call('Bash', { command: 'rg x' }, 'other')])
+  expect(groupExpanded).toBe(false)
+  await folded.unmount()
 
   const band = async () =>
     $.ui.mount({
@@ -1090,7 +1119,24 @@ test('effects show under the search row and in the band, and survive a subagent 
   // The subagent's turn start reset nothing: the band still counts the main turn's calls.
   expect(await ui.find({ text: /this turn: 4 exploration calls · 1 via jbcontext/ })).toBeDefined()
   expect(await ui.find({ text: /jbcontext delivered: 1 found after empty greps · 1 at the exact lines · 1 search → several files changed/ })).toBeDefined()
+  // While Claude works the totals line alone: the list waits for the turn's end.
+  expect(await ui.find({ text: /click a row to go to its search/ })).toBeUndefined()
   await ui.unmount()
+
+  // Once the turn ended the band stays, with the list, until the next prompt.
+  const idle = await $.ui.mount({
+    plugin: 'jbcontext-watch',
+    surface: 'terminal',
+    component: 'AbovePrompt',
+    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 9 }, view: {} } as never,
+  })
+  // The totals line gives way to its heading and a row per search.
+  expect(await idle.find({ text: /^jbcontext delivered:$/ })).toBeDefined()
+  expect(await idle.find({ text: /delivered: 1 found/ })).toBeUndefined()
+  expect(await idle.find({ text: /↳ found after 2 empty greps · exact lines · 2 files changed/ })).toBeDefined()
+  expect(await idle.find({ text: /"where retries back off between attempts"/ })).toBeDefined()
+  expect(await idle.find({ text: /click a row to go to its search/ })).toBeDefined()
+  await idle.unmount()
 
   const stored = store.get('effects:github.com/acme/widgets') as { days: Record<string, { afterEmpty: number; multiFile: number }> }
   const today = Object.values(stored.days)[0]
@@ -1110,4 +1156,80 @@ test('effects show under the search row and in the band, and survive a subagent 
   })
   expect(await again.find({ text: /found after 2 empty greps/ })).toBeDefined()
   await again.unmount()
+})
+
+test('after the turn the band lists 3 deliveries a page, p and n turn pages, a new turn starts over', async ($, on) => {
+  mock.env(on, { HOME: '/home/dev' })
+  const clock = mock.clock(on, { now: NOW })
+  on('store.get', async () => ({ value: undefined }))
+  on('store.set', async () => ({ value: undefined }))
+  on('fs.list', async () => ({ value: [] }))
+  on('fs.exists', async () => ({ value: false }))
+  on('ui.panes', async () => ({ value: [] }))
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('turn.start', async (_$, e) => ({ turnId: e.turnId }))
+  on('command.register', async (_$, e) => ({ value: { command: e.name } }))
+  on('ui.status', async () => ({ value: undefined }))
+  on('ui.render', async ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return h(Text, {}, 'engine') as RenderElement
+  })
+  on('process.run', async (_$, e) => {
+    if (e.argv[0] === 'git') return ran(e.argv.includes('--show-toplevel') ? '/repo\n' : `${HEAD}\n`)
+    return ran(STATUS)
+  })
+  on('tool.call', async (_$, e) => {
+    const call = e as unknown as Record<string, unknown>
+    if (e.tool.startsWith('mcp__')) return { ref: 1, result: {}, text: SEARCH_OUTPUT } as never
+    return {
+      ref: 1,
+      result: { type: 'text', file: { filePath: call.file_path, content: '', numLines: 40, startLine: 240, totalLines: 900 } },
+      text: '...',
+    } as never
+  })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true } as never)
+  await clock.settle()
+  await $.turn.start({ text: 'look around', turnId: 't1' } as never)
+  // Four searches, each followed by a read on its hit's lines: four deliveries.
+  for (const query of ['first query', 'second query', 'third query', 'fourth query']) {
+    await $.tool.call({ tool: 'mcp__jbcontext__code_search', text: query } as never)
+    await $.tool.call({ tool: 'Read', file_path: '/repo/src/billing/RetryPolicy.kt', offset: 240, limit: 40 } as never)
+  }
+  await clock.settle()
+
+  const mount = () =>
+    $.ui.mount({
+      plugin: 'jbcontext-watch',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 120, scroll: { offset: 0, bodyRows: 19 }, view: {} } as never,
+    })
+  let ui = await mount()
+  const queries = async () =>
+    (await ui.findAll({ type: 'Button' }))
+      .filter(found => String(found.key ?? '').startsWith('jump:'))
+      .map(found => found.text.match(/"(\w+) query"/)?.[1])
+  expect(await queries()).toEqual(['first', 'second', 'third'])
+  expect(await ui.find({ text: /1–3 of 4/ })).toBeDefined()
+  expect(await ui.find({ text: /more: click ‹ prev \/ next ›, or alt\+↑ \/ alt\+↓ \(⌥ on Mac\)/ })).toBeDefined()
+  // No hotkeys: rows and pager are clicked, and keys stay the prompt's.
+  expect(await ui.find({ text: /ctrl\+x|ctrl\+o|^\d: / })).toBeUndefined()
+  expect((await ui.find({ key: "page:next" }))?.props).toMatchObject({ action: "app:diffFileListDown" })
+  expect(await ui.find({ key: 'page:prev' })).toBeUndefined()
+
+  await ui.press({ key: 'page:next' })
+  expect(await queries()).toEqual(['fourth'])
+  expect(await ui.find({ text: /4–4 of 4/ })).toBeDefined()
+  expect(await ui.find({ key: 'page:next' })).toBeUndefined()
+  await ui.press({ key: 'page:prev' })
+  expect(await queries()).toEqual(['first', 'second', 'third'])
+  await ui.press({ key: 'page:next' })
+  await ui.unmount()
+
+  // The next prompt clears the list, and the next turn's list starts on its first page.
+  await $.turn.start({ text: 'again', turnId: 't2' } as never)
+  ui = await mount()
+  expect(await ui.find({ text: /of 4/ })).toBeUndefined()
+  await ui.unmount()
 })

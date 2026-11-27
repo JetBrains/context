@@ -17,6 +17,9 @@ import type {
   LoopWindow,
   SearchEffects,
   SearchRecord,
+  SearchTrail,
+  TrailLocal,
+  TrailUse,
 } from '../types'
 import { commandSegments, isJbcontextSearch, normalizeRepo, repoName } from './model'
 
@@ -183,11 +186,11 @@ const MAX_SNIPPET_LINES = 40
 // The hits grouped by file, their ranges merged.
 export function groupHits(hits: ParsedHit[], repoKey: string | null): Omit<HitFile, 'isKnown' | 'isFirstFinder'>[] {
   const files = new Map<string, Omit<HitFile, 'isKnown' | 'isFirstFinder'>>()
-  for (const hit of hits) {
+  for (const [at, hit] of hits.entries()) {
     const repo = isThisRepo(hit.label, repoKey) ? null : hit.label
     const path = stripDot(hit.path)
     const key = `${repo ?? ''}|${path}`
-    const file = files.get(key) ?? { path, repo, ranges: [], snippet: [], use: null }
+    const file = files.get(key) ?? { path, repo, ranges: [], snippet: [], use: null, rank: at + 1 }
     if (hit.start !== null && hit.lines > 0) {
       file.ranges.push({ start: hit.start, end: hit.start + hit.lines - 1, isTruncated: hit.isTruncated })
     }
@@ -357,12 +360,16 @@ function sharesWord(a: Set<string>, b: Set<string>): boolean {
 
 // ---------- the ledger ----------
 
-export const EMPTY_WINDOW: LoopWindow = { empty: 0, nonEmpty: 0, patterns: [] }
+export const EMPTY_WINDOW: LoopWindow = { empty: 0, nonEmpty: 0, patterns: [], steps: [] }
 export const EMPTY_LEDGER: JbLedger = { turn: 0, seq: 0, seen: [], windows: {}, searches: [] }
 
 const MAX_SEEN = 5_000
 const MAX_SEARCHES = 50
 const MAX_PATTERNS = 20
+// What a trail keeps: the local searches before a search, and the uses after it.
+const MAX_TRAIL_LOCALS = 6
+const MAX_TRAIL_USES = 8
+const MAX_SAMPLE = 3
 
 // Lines a read or an edit may be off a hit's range and still be at it; and the most a
 // read may span to count as aimed (a whole-file read is aimed at nothing).
@@ -377,8 +384,17 @@ export type UseDetail =
 export type LedgerEvent =
   | { type: 'turn' }
   | { type: 'search'; id: string; loop: string; doneSeq: number; query: string; hits: ParsedHit[]; repoKey: string | null }
-  | { type: 'local'; loop: string; seq: number; outcome: LocalOutcome['outcome']; paths: string[]; patterns: string[] }
-  | { type: 'use'; path: string; startSeq: number; doneSeq: number; detail: UseDetail }
+  | {
+      type: 'local'
+      loop: string
+      seq: number
+      outcome: LocalOutcome['outcome']
+      paths: string[]
+      patterns: string[]
+      id?: string | null
+      label?: string
+    }
+  | { type: 'use'; path: string; startSeq: number; doneSeq: number; detail: UseDetail; id?: string | null; tool?: string }
 
 // The ledger after one event, and the ids of the searches whose effects may have changed.
 export function reduce(ledger: JbLedger, event: LedgerEvent): { ledger: JbLedger; changed: string[] } {
@@ -406,6 +422,8 @@ export function reduce(ledger: JbLedger, event: LedgerEvent): { ledger: JbLedger
         query: event.query,
         files,
         window,
+        hitCount: event.hits.length,
+        uses: [],
       }
       // A search that found nothing leaves the loop's empty greps to the next one.
       const windows = files.length > 0 ? { ...ledger.windows, [event.loop]: EMPTY_WINDOW } : ledger.windows
@@ -422,10 +440,18 @@ export function reduce(ledger: JbLedger, event: LedgerEvent): { ledger: JbLedger
     case 'local': {
       if (event.outcome === 'failed') return { ledger: { ...ledger, seq: Math.max(ledger.seq, event.seq) }, changed: [] }
       const window = ledger.windows[event.loop] ?? EMPTY_WINDOW
+      const step: TrailLocal = {
+        id: event.id ?? null,
+        label: event.label ?? event.patterns.join(' '),
+        outcome: event.outcome,
+        files: event.paths.length,
+        sample: event.paths.slice(0, MAX_SAMPLE),
+      }
       const next: LoopWindow = {
         empty: window.empty + (event.outcome === 'empty' ? 1 : 0),
         nonEmpty: window.nonEmpty + (event.outcome === 'found' ? 1 : 0),
         patterns: [...window.patterns, ...event.patterns].slice(-MAX_PATTERNS),
+        steps: [...(window.steps ?? []), step].slice(-MAX_TRAIL_LOCALS),
       }
       return {
         ledger: {
@@ -442,16 +468,20 @@ export function reduce(ledger: JbLedger, event: LedgerEvent): { ledger: JbLedger
       const searches = ledger.searches.map(search => {
         if (search.doneSeq >= event.startSeq) return search
         let isChanged = false
+        const steps: TrailUse[] = []
         const files = search.files.map(file => {
           if (file.repo !== null || file.path !== event.path) return file
+          steps.push(trailUse(event, file))
           const use = mergeUse(file.use, event.detail, file)
           if (sameUse(use, file.use)) return file
           isChanged = true
           return { ...file, use }
         })
-        if (!isChanged) return search
+        // A use the badge already counts still goes on the trail.
+        if (steps.length === 0) return search
         changed.push(search.id)
-        return { ...search, files }
+        const uses = [...(search.uses ?? []), ...steps].slice(-MAX_TRAIL_USES)
+        return { ...search, files: isChanged ? files : search.files, uses }
       })
       return {
         ledger: { ...ledger, seq: Math.max(ledger.seq, event.doneSeq), seen: addSeen(ledger.seen, [event.path]), searches },
@@ -476,6 +506,30 @@ function mergeUse(use: HitUse | null, detail: UseDetail, file: HitFile): HitUse 
     read: base.read || detail.kind === 'read',
     edited: base.edited || detail.kind === 'edit',
     exact: base.exact || isAimed(detail, file),
+  }
+}
+
+// A use as the trail shows it: what was read or changed, and the hit it fell on.
+function trailUse(event: Extract<LedgerEvent, { type: 'use' }>, file: HitFile): TrailUse {
+  const { detail } = event
+  const lines =
+    detail.kind === 'read'
+      ? detail.isPartial && detail.end < Number.MAX_SAFE_INTEGER / 2
+        ? { start: detail.start, end: detail.end }
+        : null
+      : (detail.hunks[0] ?? null)
+  // The hit nearest what was used: the one it overlaps, else the first.
+  const range =
+    (lines && file.ranges.find(one => overlaps(lines, widened(one)))) ?? file.ranges[0] ?? null
+  return {
+    id: event.id ?? null,
+    kind: detail.kind,
+    tool: event.tool ?? (detail.kind === 'read' ? 'Read' : 'Edit'),
+    path: file.path,
+    lines,
+    rank: file.rank ?? 0,
+    hit: range ? { start: range.start, end: range.end } : null,
+    exact: isAimed(detail, file),
   }
 }
 
@@ -615,6 +669,86 @@ export function addToDay(stored: StoredEffects | undefined, day: string, delta: 
   days[day] = addCounts(days[day] ?? ZERO_COUNTS, delta)
   const kept = Object.keys(days).sort().slice(-keep)
   return { days: Object.fromEntries(kept.map(key => [key, days[key]!])) }
+}
+
+// ---------- trails ----------
+
+// How a search delivered: the local searches before it, what it returned, and the reads
+// and edits of its hits since.
+export function trailOf(search: SearchRecord): SearchTrail {
+  const queryWords = tokens(search.query)
+  const discovered = search.files.filter(file => file.use !== null && file.isFirstFinder && !file.isKnown)
+  return {
+    turn: search.turn,
+    query: search.query,
+    hitCount: search.hitCount ?? search.files.length,
+    fileCount: search.files.length,
+    before: search.window.steps ?? [],
+    uses: search.uses ?? [],
+    target: discovered[0]?.path ?? null,
+    meaning:
+      queryWords.size >= 2
+        ? discovered
+            .filter(file => !sharesWord(queryWords, tokens(`${file.path} ${file.snippet.join(' ')}`)))
+            .map(file => file.path)
+        : [],
+  }
+}
+
+export type TrailLine = {
+  // `miss` an empty local search, `near` one that returned other files, `search`
+  // the jbcontext call, `use` a read or edit of a hit, `meaning` a file found by
+  // meaning.
+  kind: 'miss' | 'near' | 'search' | 'use' | 'meaning'
+  mark: string
+  text: string
+  note: string
+}
+
+const MAX_LABEL = 64
+
+function clip(text: string, max = MAX_LABEL): string {
+  const line = text.replace(/\s+/g, ' ').trim()
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line
+}
+
+function lineSpan(lines: { start: number; end: number }): string {
+  return lines.start === lines.end ? `${lines.start}` : `${lines.start}-${lines.end}`
+}
+
+// The trail as lines: one per local search, the search, one per use, then the files it
+// found by meaning.
+export function describeTrail(trail: SearchTrail): TrailLine[] {
+  const out: TrailLine[] = []
+  for (const step of trail.before) {
+    if (step.outcome === 'empty') {
+      out.push({ kind: 'miss', mark: '✗', text: clip(step.label), note: 'nothing found' })
+      continue
+    }
+    const named = step.files === 0 ? 'output' : plural(step.files, 'file')
+    const notTarget = trail.target && !step.sample.includes(trail.target) ? `, not ${trail.target}` : ''
+    out.push({ kind: 'near', mark: '○', text: clip(step.label), note: `${named}${notTarget}` })
+  }
+  out.push({
+    kind: 'search',
+    mark: '●',
+    text: `jbcontext search "${clip(trail.query, MAX_LABEL - 20)}"`,
+    note: `${plural(trail.hitCount, 'hit')} in ${plural(trail.fileCount, 'file')}`,
+  })
+  for (const use of trail.uses) {
+    const where = use.lines ? `:${lineSpan(use.lines)}` : use.kind === 'read' ? ' (whole file)' : ''
+    const hit = `hit #${use.rank}${use.hit ? `, lines ${lineSpan(use.hit)}` : ''}`
+    out.push({
+      kind: 'use',
+      mark: use.kind === 'edit' ? '✎' : '▸',
+      text: `${use.tool} ${use.path}${where}`,
+      note: use.exact ? `${hit} · on the hit` : hit,
+    })
+  }
+  for (const path of trail.meaning) {
+    out.push({ kind: 'meaning', mark: '≈', text: path, note: 'no word of the query in its path or snippet' })
+  }
+  return out
 }
 
 // ---------- text ----------
