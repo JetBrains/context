@@ -1,6 +1,19 @@
 # {{JBCONTEXT}} files
 
-Find filenames and paths: `{{JBCONTEXT}} files '**/*Test.kt'`. Accepts substrings or globs.
+Find filenames and paths: `{{JBCONTEXT}} files "pattern" --plain`. Accepts substrings or globs.
+
+## Paths for shell use
+
+Use `--plain` for command substitution and pipelines. It prints one complete project-relative path per
+stdout line, without headers, outlines, notes, or directory grouping. Default text output is for display;
+do not extract paths from it with `grep`, `head`, or similar text filters.
+
+Quote selected paths, for example `cat -- "$path"`. Read them from the project root, or resolve them
+against the project selected with `--project`. Keep stderr separate; do not merge it into the path
+stream with `2>&1`. Inspect multiple matches before selecting a file.
+
+Use `--format json` when availability, completeness, or coverage matters. Empty plain output alone
+does not establish absence: inspect the structured result and check scope and spelling.
 
 ## Scope and results
 

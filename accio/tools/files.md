@@ -1,1 +1,1 @@
-| Partial filename | `{{JBCONTEXT}} files "pattern"` |
+| Filename/path | `{{JBCONTEXT}} files "pattern" --plain` |
