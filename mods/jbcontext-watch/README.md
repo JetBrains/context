@@ -5,6 +5,13 @@ A Claude Code mod that shows what `jbcontext` is doing in the repository you are
 - **Status line under the prompt, always**: whether search can use the remote index, and, once a turn has been measured in a session that used jbcontext, how much of the session's exploring went through it: `jbcontext · remote index ✓ · session: 4% of exploring via jbcontext`. The index is `✓` whichever commit's snapshot search answers from, HEAD's or an older one, or another branch's; a repository with none reads `jbcontext ✗ repository not indexed`, and a failure `jbcontext ✗ <reason>`.
 - **Spinner, while a jbcontext call runs**: what it searches for, `Searching jbcontext: "where is the stats writer"…`, then for a few seconds how it went, `jbcontext: 12 hits in 1.4s`.
 - **Band above the prompt, while Claude works**: once the turn called jbcontext, its exploration so far, `this turn: 14 exploration calls · 2 via jbcontext (12 hits)`, or `indexing...` while Claude runs `jbcontext index`; ``no snapshots for this repository; run `jbcontext index` `` or why the index can't be read; and any error from the last hour. Nothing while there is none of these.
+- **Under a jbcontext search's row, once its hits are used**: what the search achieved, filled in as Claude reads and edits the files it found: `↳ found after 3 empty greps · exact lines · 2 files changed`. While Claude works, the band sums up the turn: `jbcontext delivered: 1 found after empty greps · 2 at the exact lines`. The effects, each credited only once a hit's file is read or edited after the search:
+  - **found after empty greps**: local searches (grep, rg, find, git grep) came up empty before the search found the file;
+  - **found by meaning, not by name**: no word of the query is in the file's path or snippet;
+  - **exact lines**: a partial read or an edit landed within 10 lines of a hit;
+  - **files changed**: two or more of the search's files got edited.
+
+  The first two go only to the first search of the turn that listed the file, when the turn had not met it in a grep's output, a read or an edit before. Each day's totals are kept per repository in the mod's store (`effects:<repository>`).
 - **A line beneath the answer, when Claude finishes a turn that called jbcontext**: the session's jbcontext calls so far, their share of its exploring tokens, and those tokens and time. Subagents count. The last such line stands as the session's summary once it ends:
 
   ```
