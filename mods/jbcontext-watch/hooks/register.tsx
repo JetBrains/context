@@ -85,8 +85,15 @@ const trailsState = atom({ plugin: 'jbcontext-watch', key: 'trails' } as const, 
 const deliveriesState = atom({ plugin: 'jbcontext-watch', key: 'deliveries' } as const, null as string[] | null)
 const EFFECTS_KEY = 'effects:'
 const MAX_TRAILS = 200
-// Rows of the band's list, each pressed by its digit.
-const MAX_DELIVERIES_SHOWN = 5
+// Rows of a page of the band's list, each a click to its search; ‹ prev and next › turn pages.
+const DELIVERIES_PER_PAGE = 3
+// The keys that turn its pages from the prompt, no focus needed: the engine actions bound to
+// alt+↑ / alt+↓ (⌥ on Mac) and ctrl+↑ / ctrl+↓ (taken by macOS for Mission Control), which
+// only the diff panel handles; elsewhere a Button naming them takes the chord.
+const PAGE_PREV_ACTION = 'app:diffFileListUp'
+const PAGE_NEXT_ACTION = 'app:diffFileListDown'
+// The page of the band's list on screen, from 0; back to the first with each turn.
+const deliveriesPage = atom({ plugin: 'jbcontext-watch', key: 'deliveriesPage' } as const, 0)
 // What the band's list starts with once the turn ended.
 const DELIVERED_HEADING = 'jbcontext delivered:'
 
@@ -792,6 +799,7 @@ export const register: Register = on => {
     await update($, ledgerState, value => reduce(value ?? EMPTY_LEDGER, { type: 'turn' }).ledger)
     await update($, countsState, value => ({ session: value?.session ?? ZERO_COUNTS, turn: ZERO_COUNTS }))
     await update($, deliveriesState, () => [])
+    await update($, deliveriesPage, () => 0)
     return next(e)
   })
 
@@ -875,6 +883,7 @@ export const register: Register = on => {
       patchedSeq = measureSeq
       await update($, countsState, () => ({ session: ZERO_COUNTS, turn: ZERO_COUNTS }))
       await update($, deliveriesState, () => [])
+    await update($, deliveriesPage, () => 0)
       return patch($, () => ({ session: null }))
     }
     if (isReplaced) await forget()
@@ -912,8 +921,12 @@ export const register: Register = on => {
     const isListed = !e.props.isWorking && deliveries.length > 0
     const badges = isListed ? ((await read($, badgesState)) ?? {}) : {}
     const trails = isListed ? ((await read($, trailsState)) ?? {}) : {}
-    const shown = isListed ? deliveries.filter(id => badges[id] !== undefined).slice(0, MAX_DELIVERIES_SHOWN) : []
-    const hidden = isListed ? deliveries.length - shown.length : 0
+    const listed = isListed ? deliveries.filter(id => badges[id] !== undefined) : []
+    const pages = Math.max(1, Math.ceil(listed.length / DELIVERIES_PER_PAGE))
+    const page = Math.min(isListed ? await read($, deliveriesPage) : 0, pages - 1)
+    const first = page * DELIVERIES_PER_PAGE
+    const shown = listed.slice(first, first + DELIVERIES_PER_PAGE)
+    const turnPage = (by: number) => void update($, deliveriesPage, value => Math.max(0, Math.min(pages - 1, Math.min(value, pages - 1) + by)))
 
     const { Box, Text, Button } = $.ui.resolve(e)
     const index = describeIndex(current.index, now)
@@ -943,16 +956,30 @@ export const register: Register = on => {
             </Text>
           )
         )}
-        {shown.map((id, at) => (
-          <Button key={`jump:${id}`} hotkey={String(at + 1)} plain onPress={() => void jumpTo($, id)}>
+        {shown.map(id => (
+          <Button key={`jump:${id}`} plain onPress={() => void jumpTo($, id)}>
             <Text color="success">{`  ${describeEffects(badges[id]!) ?? ''}`}</Text>
             <Text dimColor>{trails[id] ? `  "${clipQuery(trails[id]!.query)}"` : ''}</Text>
           </Button>
         ))}
-        {hidden > 0 && <Text dimColor>  and {hidden} more under their searches</Text>}
+        {pages > 1 && (
+          <Box flexDirection="row">
+            {page > 0 ? (
+              <Button key="page:prev" plain action={PAGE_PREV_ACTION} onPress={() => turnPage(-1)}>‹ prev</Button>
+            ) : (
+              <Text dimColor>‹ prev</Text>
+            )}
+            <Text dimColor>{`   ${first + 1}–${first + shown.length} of ${listed.length}   `}</Text>
+            {page < pages - 1 ? (
+              <Button key="page:next" plain action={PAGE_NEXT_ACTION} onPress={() => turnPage(1)}>next ›</Button>
+            ) : (
+              <Text dimColor>next ›</Text>
+            )}
+          </Box>
+        )}
         {shown.length > 0 && (
           <Text dimColor wrap="truncate-end">
-            {`click a row, or ctrl+x tab then 1–${shown.length}, to jump to its search · ctrl+o shows how each one delivered`}
+            {`click a row to go to its search${pages > 1 ? ' · more: click ‹ prev / next ›, or alt+↑ / alt+↓ (⌥ on Mac)' : ''}`}
           </Text>
         )}
         {isIndexShown && (

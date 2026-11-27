@@ -215,6 +215,8 @@ declare module 'claude-code' {
       trails: Record<string, SearchTrail> | null
       // This turn's searches with something on their badge, in the order they first got it.
       deliveries: string[] | null
+      // The page of the band's list on screen, from 0.
+      deliveriesPage: number
     }
   }
 }
